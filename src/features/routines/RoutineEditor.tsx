@@ -49,8 +49,7 @@ function RoutineEditor({
       cancelled = true;
     };
   }, [storage]);
-
-  const nameValid = name.trim().length > 0;
+const nameValid = name.trim().length > 0;
   const exercisesComplete = exercises.every(
     (exercise) =>
       exercise.name.trim() !== '' &&
@@ -61,11 +60,13 @@ function RoutineEditor({
             (set.targetReps != null && set.targetReps > 0) ||
             (set.myorep?.activationRepTarget != null &&
               set.myorep.activationRepTarget > 0)
-          : set.toFailure || (set.targetReps != null && set.targetReps > 0);
+          : set.toFailure ||
+            (set.targetReps != null && set.targetReps > 0);
         // §4.1: Percentage sets derive weight from a source set
         const weightOk =
-          set.weightMode === 'percentageOfSet' ||
-          (set.targetWeightKg != null && set.targetWeightKg > 0);
+          set.weightMode === 'percentageOfSet'
+            ? set.percentageOf != null && set.percentageOf.percent > 0
+            : set.targetWeightKg != null && set.targetWeightKg > 0;
         const myoOk =
           !set.isMyorep ||
           (set.myorep?.miniSetRepTarget != null &&

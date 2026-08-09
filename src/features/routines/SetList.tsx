@@ -1,9 +1,11 @@
 import Button from '../../components/Button';
+import Select from '../../components/Select';
 import Switch from '../../components/Switch';
 import TextField from '../../components/TextField';
 import { createSetDefinition } from '../../types/factories';
 import type { SetDefinition } from '../../types/models';
 import { moveItem, removeAt, renumber } from '../../utils/order';
+import { roundToIncrement } from '../../utils/weight';
 
 interface SetListProps {
   sets: SetDefinition[];
@@ -83,6 +85,51 @@ function SetList({ sets, onChange }: SetListProps) {
     });
   }
 
+  function handlePercentageToggle(index: number) {
+    const set = sets[index];
+    if (set.weightMode === 'percentageOfSet') {
+      handlePatch(index, {
+        weightMode: 'absolute',
+        percentageOf: undefined,
+      });
+    } else {
+      // §4.1: defaults to the immediately preceding set in the same exercise
+      const source = sets[index - 1];
+      handlePatch(index, {
+        weightMode: 'percentageOfSet',
+        percentageOf: source
+          ? { sourceSetId: source.id, percent: 80 }
+          : undefined,
+      });
+    }
+  }
+
+  function handlePercentagePatch(
+    index: number,
+    field: 'sourceSetId' | 'percent',
+    value: string | number | undefined,
+  ) {
+    const current = sets[index].percentageOf;
+    handlePatch(index, {
+      percentageOf: {
+        sourceSetId: current?.sourceSetId ?? '',
+        percent: current?.percent ?? 0,
+        ...(field === 'sourceSetId' ? { sourceSetId: String(value) } : {}),
+        ...(field === 'percent' ? { percent: value as number } : {}),
+      },
+    });
+  }
+
+  /** §4.1: read-only derived weight, rounded to the plate increment. */
+  function computedWeight(index: number): number | null {
+    const set = sets[index];
+    const percentage = set.percentageOf;
+    if (!percentage || percentage.percent <= 0) return null;
+    const source = sets.find((s) => s.id === percentage.sourceSetId);
+    if (!source || source.targetWeightKg == null) return null;
+    return roundToIncrement((source.targetWeightKg * percentage.percent) / 100);
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold text-ink-2">Sets</h3>
@@ -142,6 +189,13 @@ function SetList({ sets, onChange }: SetListProps) {
               label="Myorep"
               ariaLabel={`Set ${index + 1} Myorep`}
               onClick={() => handleMyorepToggle(index)}
+            />
+            <Switch
+              className="flex-1"
+              checked={set.weightMode === 'percentageOfSet'}
+              label="% of set"
+              ariaLabel={`Set ${index + 1} percent of set`}
+              onClick={() => handlePercentageToggle(index)}
             />
           </div>
 
@@ -248,6 +302,58 @@ function SetList({ sets, onChange }: SetListProps) {
                   placeholder="Optional"
                 />
               </div>
+            </div>
+          )}
+
+          {set.weightMode === 'percentageOfSet' && (
+            <div className="flex flex-col gap-2 rounded-lg border border-line/70 bg-panel p-3">
+              <p className="text-sm font-semibold text-ink-2">
+                Percent of set
+              </p>
+              {index === 0 || sets.length === 1 ? (
+                <p className="text-sm text-ink-3">
+                  No earlier set to base this on — reorder a set before it
+                  first.
+                </p>
+              ) : (
+                <div className="flex gap-2">
+                  <Select
+                    label={`Set ${index + 1} based on`}
+                    value={set.percentageOf?.sourceSetId ?? ''}
+                    onChange={(value) =>
+                      handlePercentagePatch(index, 'sourceSetId', value)
+                    }
+                    options={Array.from({ length: index }, (_, k) => {
+                      const s = sets[k];
+                      const name =
+                        s.targetWeightKg != null
+                          ? `Set ${k + 1} (${s.targetWeightKg} kg)`
+                          : `Set ${k + 1}`;
+                      return { value: s.id, label: name };
+                    })}
+                  />
+                  <TextField
+                    label={`Set ${index + 1} percent`}
+                    type="number"
+                    min={1}
+                    max={200}
+                    step={1}
+                    value={numberInput(set.percentageOf?.percent)}
+                    onChange={(raw) =>
+                      handlePercentagePatch(index, 'percent', parseNumber(raw))
+                    }
+                    placeholder="80"
+                  />
+                </div>
+              )}
+              {(() => {
+                const computed = computedWeight(index);
+                return computed != null ? (
+                  <p className="text-sm text-ink-2">
+                    Load {computed} kg
+                  </p>
+                ) : null;
+              })()}
             </div>
           )}
         </div>

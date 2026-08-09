@@ -437,6 +437,78 @@ describe('RoutinesHome — myorep toggle & config', () => {
   });
 });
 
+describe('RoutinesHome — percentage-of-set', () => {
+  async function newRoutineWithTwoSets(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Bench Press');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '100');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 2 reps/), '10');
+  }
+
+  it('defaults source to the preceding set and shows a computed weight', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+
+    const source = screen.getByLabelText(/Set 2 based on/) as HTMLSelectElement;
+    expect(source.value).not.toBe('');
+    const option = screen.getByRole('option', { name: /Set 1 \(100 kg\)/ });
+    expect((option as HTMLOptionElement).selected).toBe(true);
+    expect(screen.getByText(/Load 80 kg/)).toBeInTheDocument();
+  });
+
+  it('saves the percentage as the set weight mode', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      const set = routines[0].exercises[0].sets[1];
+      expect(set.weightMode).toBe('percentageOfSet');
+      expect(set.percentageOf?.percent).toBe(80);
+      expect(set.percentageOf?.sourceSetId).toBe(
+        routines[0].exercises[0].sets[0].id,
+      );
+      expect(set.targetWeightKg).toBeUndefined();
+    });
+  });
+
+  it('recomputes the load when source weight or percent changes', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+
+    await user.clear(screen.getByRole('spinbutton', { name: /percent/ }));
+    await user.type(screen.getByRole('spinbutton', { name: /percent/ }), '50');
+
+    expect(screen.getByText(/Load 50 kg/)).toBeInTheDocument();
+  });
+
+  it('keeps Save disabled until a percentage is entered', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+    await user.clear(screen.getByRole('spinbutton', { name: /percent/ }));
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();
+  });
+});
+
 describe('RoutinesHome — list & select saved routines', () => {
   async function saveRoutine(
     user: ReturnType<typeof userEvent.setup>,

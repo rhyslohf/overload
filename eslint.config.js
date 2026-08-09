@@ -43,5 +43,14 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
     },
   },
+  {
+    // StorageService is deliberately async (swappable to IndexedDB later,
+    // §4.4). The sync-backed localStorage adapter has no awaits to await —
+    // that's by design, not accidental.
+    files: ['src/services/**/*Adapter.ts'],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
+    },
+  },
   prettier,
 );

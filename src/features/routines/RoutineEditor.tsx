@@ -2,7 +2,10 @@ import { useState, type FormEvent } from 'react';
 import Button from '../../components/Button';
 import TextField from '../../components/TextField';
 import { createRoutine } from '../../types/factories';
-import type { Routine } from '../../types/models';
+import type { Routine, RoutineExercise } from '../../types/models';
+import { exerciseIdForName } from '../../utils/exercise';
+import { renumber } from '../../utils/order';
+import ExerciseList from './ExerciseList';
 
 interface RoutineEditorProps {
   initialRoutine?: Routine | null;
@@ -25,12 +28,27 @@ function RoutineEditor({
   const [description, setDescription] = useState(
     initialRoutine?.description ?? '',
   );
+  const [exercises, setExercises] = useState<RoutineExercise[]>(
+    initialRoutine?.exercises ?? [],
+  );
 
   const nameValid = name.trim().length > 0;
+  const exercisesComplete = exercises.every(
+    (exercise) => exercise.name.trim() !== '',
+  );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!nameValid) return;
+    if (exercises.some((exercise) => exercise.name.trim() === '')) return;
+
+    const savedExercises = renumber(
+      exercises.map((exercise) => ({
+        ...exercise,
+        name: exercise.name.trim(),
+        exerciseId: exerciseIdForName(exercise.name),
+      })),
+    );
 
     const routine: Routine = editing
       ? {
@@ -38,8 +56,9 @@ function RoutineEditor({
           name: name.trim(),
           description: description.trim() || undefined,
           updatedAt: new Date().toISOString(),
+          exercises: savedExercises,
         }
-      : createRoutine({ name, description });
+      : { ...createRoutine({ name, description }), exercises: savedExercises };
 
     onSave(routine);
   }
@@ -78,8 +97,16 @@ function RoutineEditor({
         />
       </div>
 
+      <hr className="border-line" />
+
+      <ExerciseList exercises={exercises} onChange={setExercises} />
+
       <div className="mt-auto flex flex-col gap-2">
-        <Button type="submit" disabled={!nameValid} className="w-full">
+        <Button
+          type="submit"
+          disabled={!nameValid || !exercisesComplete}
+          className="w-full"
+        >
           Save routine
         </Button>
         <Button

@@ -12,6 +12,14 @@ interface RoutineDetailProps {
 
 function formatSet(set: Routine['exercises'][number]['sets'][number]): string {
   const weight = set.targetWeightKg != null ? `${set.targetWeightKg} kg` : '—';
+  if (set.isMyorep) {
+    const activation = set.toFailure
+      ? 'to failure'
+      : `${set.myorep?.activationRepTarget ?? '?'} reps`;
+    const miniReps = set.myorep?.miniSetRepTarget ?? '?';
+    const miniRest = set.myorep?.miniSetRestSeconds ?? '?';
+    return `Myorep: ${activation} + minisets of ${miniReps} (${miniRest}s rest) × ${weight}`;
+  }
   if (set.toFailure) return `To failure × ${weight}`;
   const reps = set.targetRepsMax
     ? `${set.targetReps}–${set.targetRepsMax}`

@@ -350,6 +350,93 @@ describe('RoutinesHome — to-failure toggle', () => {
   });
 });
 
+describe('RoutinesHome — myorep toggle & config', () => {
+  async function newRoutineWithExercise(
+    user: ReturnType<typeof userEvent.setup>,
+  ) {
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Bench Press');
+  }
+
+  it('reveals myorep config with defaults and saves it', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await newRoutineWithExercise(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+    await user.click(screen.getByRole('switch', { name: /Set 1 Myorep/i }));
+
+    expect(screen.getByLabelText(/Set 1 mini-set rest/)).toHaveValue(20);
+
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      const set = routines[0].exercises[0].sets[0];
+      expect(set.isMyorep).toBe(true);
+      expect(set.myorep).toMatchObject({
+        activationRepTarget: 15,
+        miniSetRepTarget: 3,
+        miniSetRestSeconds: 20,
+      });
+      expect(set.targetWeightKg).toBe(60);
+    });
+  });
+
+  it('hides the plain reps field when myorep is on', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithExercise(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.click(screen.getByRole('switch', { name: /Set 1 Myorep/i }));
+
+    expect(screen.queryByLabelText(/Set 1 reps/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Set 1 activation reps/)).toBeInTheDocument();
+  });
+
+  it('can edit the myorep activation / mini-set values', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await newRoutineWithExercise(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 weight/), '40');
+    await user.click(screen.getByRole('switch', { name: /Set 1 Myorep/i }));
+
+    await user.clear(screen.getByLabelText(/Set 1 activation reps/));
+    await user.type(screen.getByLabelText(/Set 1 activation reps/), '12');
+    await user.clear(screen.getByLabelText(/Set 1 mini-set reps/));
+    await user.type(screen.getByLabelText(/Set 1 mini-set reps/), '5');
+
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      const set = routines[0].exercises[0].sets[0];
+      expect(set.myorep?.activationRepTarget).toBe(12);
+      expect(set.myorep?.miniSetRepTarget).toBe(5);
+    });
+  });
+
+  it('keeps Save disabled if mini-set rest is cleared', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithExercise(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 weight/), '40');
+    await user.click(screen.getByRole('switch', { name: /Set 1 Myorep/i }));
+
+    await user.clear(screen.getByLabelText(/Set 1 mini-set rest/));
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();
+  });
+});
+
 describe('RoutinesHome — list & select saved routines', () => {
   async function saveRoutine(
     user: ReturnType<typeof userEvent.setup>,

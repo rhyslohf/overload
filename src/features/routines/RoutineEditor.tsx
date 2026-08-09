@@ -55,14 +55,24 @@ function RoutineEditor({
     (exercise) =>
       exercise.name.trim() !== '' &&
       exercise.sets.every((set) => {
-        // §4.1: To-Failure sets have no target reps
-        const repsOk =
-          set.toFailure || (set.targetReps != null && set.targetReps > 0);
+        // §4.1: Myorep sets need activation + mini-set config, no plain reps
+        const repsOk = set.isMyorep
+          ? set.toFailure ||
+            (set.targetReps != null && set.targetReps > 0) ||
+            (set.myorep?.activationRepTarget != null &&
+              set.myorep.activationRepTarget > 0)
+          : set.toFailure || (set.targetReps != null && set.targetReps > 0);
         // §4.1: Percentage sets derive weight from a source set
         const weightOk =
           set.weightMode === 'percentageOfSet' ||
           (set.targetWeightKg != null && set.targetWeightKg > 0);
-        return repsOk && weightOk;
+        const myoOk =
+          !set.isMyorep ||
+          (set.myorep?.miniSetRepTarget != null &&
+            set.myorep.miniSetRepTarget > 0 &&
+            set.myorep.miniSetRestSeconds != null &&
+            set.myorep.miniSetRestSeconds > 0);
+        return repsOk && weightOk && myoOk;
       }),
   );
 

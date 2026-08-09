@@ -1,4 +1,5 @@
 import Button from '../../components/Button';
+import Switch from '../../components/Switch';
 import TextField from '../../components/TextField';
 import { createSetDefinition } from '../../types/factories';
 import type { SetDefinition } from '../../types/models';
@@ -20,10 +21,17 @@ function parseNumber(raw: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/** Defaults applied when a Myorep toggle is switched on (§4.1). */
+const MYOREP_DEFAULTS = {
+  activationRepTarget: 15,
+  miniSetRepTarget: 3,
+  miniSetRestSeconds: 20,
+} as const;
+
 /**
- * Ordered list of an exercise's sets. Phase 1 kept sets plain (reps +
- * weight only); Phase 2 adds the advanced toggles (to-failure, myorep,
- * percentage). Immutable add/remove/reorder through the order utils.
+ * Ordered list of an exercise's sets. Phase 2 advanced toggles: to-failure
+ * (no target reps), myorep (activation + mini-set config, §4.1) and — from
+ * the next item — percentage-of-set. Immutable add/remove/reorder.
  */
 function SetList({ sets, onChange }: SetListProps) {
   function handlePatch(index: number, partial: Partial<SetDefinition>) {
@@ -50,6 +58,28 @@ function SetList({ sets, onChange }: SetListProps) {
       toFailure: !set.toFailure,
       // §4.1: target reps are omitted when To-Failure is on
       targetReps: set.toFailure ? set.targetReps : undefined,
+    });
+  }
+
+  function handleMyorepToggle(index: number) {
+    const set = sets[index];
+    if (set.isMyorep) {
+      handlePatch(index, { isMyorep: false, myorep: undefined });
+    } else {
+      handlePatch(index, {
+        isMyorep: true,
+        myorep: { ...MYOREP_DEFAULTS },
+      });
+    }
+  }
+
+  function handleMyorepPatch(
+    index: number,
+    field: keyof NonNullable<SetDefinition['myorep']>,
+    value: number | undefined,
+  ) {
+    handlePatch(index, {
+      myorep: { ...sets[index].myorep, [field]: value },
     });
   }
 
@@ -98,35 +128,25 @@ function SetList({ sets, onChange }: SetListProps) {
             </Button>
           </div>
 
-          <button
-            type="button"
-            role="switch"
-            aria-checked={set.toFailure}
-            aria-label={`Set ${index + 1} to failure`}
-            onClick={() => handleToFailureToggle(index)}
-            className={`flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors duration-100 ${
-              set.toFailure
-                ? 'border-accent/50 bg-accent/10 text-accent-hi'
-                : 'border-line/70 bg-panel text-ink-2'
-            }`}
-          >
-            To failure
-            <span
-              aria-hidden="true"
-              className={`h-5 w-9 rounded-full p-0.5 transition-colors duration-100 ${
-                set.toFailure ? 'bg-accent' : 'bg-line'
-              }`}
-            >
-              <span
-                className={`block h-4 w-4 rounded-full bg-panel transition-transform duration-100 ${
-                  set.toFailure ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </span>
-          </button>
+          <div className="flex gap-2">
+            <Switch
+              className="flex-1"
+              checked={set.toFailure}
+              label="To failure"
+              ariaLabel={`Set ${index + 1} to failure`}
+              onClick={() => handleToFailureToggle(index)}
+            />
+            <Switch
+              className="flex-1"
+              checked={set.isMyorep}
+              label="Myorep"
+              ariaLabel={`Set ${index + 1} Myorep`}
+              onClick={() => handleMyorepToggle(index)}
+            />
+          </div>
 
-          {!set.toFailure && (
-            <div className="flex gap-2">
+          <div className="flex gap-2">
+            {!set.toFailure && !set.isMyorep && (
               <TextField
                 label={`Set ${index + 1} reps`}
                 type="number"
@@ -138,6 +158,8 @@ function SetList({ sets, onChange }: SetListProps) {
                 }
                 placeholder="10"
               />
+            )}
+            {set.weightMode !== 'percentageOfSet' && (
               <TextField
                 label={`Set ${index + 1} weight (kg)`}
                 type="number"
@@ -147,23 +169,85 @@ function SetList({ sets, onChange }: SetListProps) {
                 onChange={(raw) =>
                   handlePatch(index, { targetWeightKg: parseNumber(raw) })
                 }
-                placeholder="60"
+                placeholder={set.isMyorep ? 'Activation weight' : '60'}
               />
-            </div>
-          )}
-          {set.toFailure && (
-            <div className="flex gap-2">
-              <TextField
-                label={`Set ${index + 1} weight (kg)`}
-                type="number"
-                min={0}
-                step={0.5}
-                value={numberInput(set.targetWeightKg)}
-                onChange={(raw) =>
-                  handlePatch(index, { targetWeightKg: parseNumber(raw) })
-                }
-                placeholder="60"
-              />
+            )}
+          </div>
+
+          {set.isMyorep && (
+            <div className="flex flex-col gap-2 rounded-lg border border-line/70 bg-panel p-3">
+              <p className="text-sm font-semibold text-ink-2">Myorep config</p>
+              <div className="flex gap-2">
+                <TextField
+                  label={`Set ${index + 1} activation reps`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={numberInput(set.myorep?.activationRepTarget)}
+                  onChange={(raw) =>
+                    handleMyorepPatch(
+                      index,
+                      'activationRepTarget',
+                      parseNumber(raw),
+                    )
+                  }
+                  placeholder="15"
+                />
+                <TextField
+                  label={`Set ${index + 1} mini-set reps`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={numberInput(set.myorep?.miniSetRepTarget)}
+                  onChange={(raw) =>
+                    handleMyorepPatch(
+                      index,
+                      'miniSetRepTarget',
+                      parseNumber(raw),
+                    )
+                  }
+                  placeholder="3"
+                />
+                <TextField
+                  label={`Set ${index + 1} mini-set rest (s)`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={numberInput(set.myorep?.miniSetRestSeconds)}
+                  onChange={(raw) =>
+                    handleMyorepPatch(
+                      index,
+                      'miniSetRestSeconds',
+                      parseNumber(raw),
+                    )
+                  }
+                  placeholder="20"
+                />
+              </div>
+              <div className="flex gap-2">
+                <TextField
+                  label={`Set ${index + 1} max mini-sets`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={numberInput(set.myorep?.maxMiniSets)}
+                  onChange={(raw) =>
+                    handleMyorepPatch(index, 'maxMiniSets', parseNumber(raw))
+                  }
+                  placeholder="Optional"
+                />
+                <TextField
+                  label={`Set ${index + 1} stop below reps`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={numberInput(set.myorep?.stopBelowReps)}
+                  onChange={(raw) =>
+                    handleMyorepPatch(index, 'stopBelowReps', parseNumber(raw))
+                  }
+                  placeholder="Optional"
+                />
+              </div>
             </div>
           )}
         </div>

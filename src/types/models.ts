@@ -39,9 +39,9 @@ export interface SetDefinition {
   percentageOf?: { sourceSetId: string; percent: number }; // when weightMode = 'percentageOfSet'
   isMyorep: boolean;
   myorep?: {
-    activationRepTarget: number;
-    miniSetRepTarget: number;
-    miniSetRestSeconds: number;
+    activationRepTarget?: number;
+    miniSetRepTarget?: number;
+    miniSetRestSeconds?: number;
     maxMiniSets?: number;
     stopBelowReps?: number;
   };

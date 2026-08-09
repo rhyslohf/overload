@@ -1,6 +1,7 @@
 import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
 import type { Routine } from '../../types/models';
+import { formatSetDefinition } from '../../utils/formatSet';
 import { useEffect, useState } from 'react';
 
 interface RoutineDetailProps {
@@ -8,23 +9,7 @@ interface RoutineDetailProps {
   onBack: () => void;
   onEdit: (routine: Routine) => void;
   onDelete: (routineId: string) => void;
-}
-
-function formatSet(set: Routine['exercises'][number]['sets'][number]): string {
-  const weight = set.targetWeightKg != null ? `${set.targetWeightKg} kg` : '—';
-  if (set.isMyorep) {
-    const activation = set.toFailure
-      ? 'to failure'
-      : `${set.myorep?.activationRepTarget ?? '?'} reps`;
-    const miniReps = set.myorep?.miniSetRepTarget ?? '?';
-    const miniRest = set.myorep?.miniSetRestSeconds ?? '?';
-    return `Myorep: ${activation} + minisets of ${miniReps} (${miniRest}s rest) × ${weight}`;
-  }
-  if (set.toFailure) return `To failure × ${weight}`;
-  const reps = set.targetRepsMax
-    ? `${set.targetReps}–${set.targetRepsMax}`
-    : `${set.targetReps}`;
-  return `${reps} × ${weight}`;
+  onStart: (routine: Routine) => void;
 }
 
 /**
@@ -37,6 +22,7 @@ function RoutineDetail({
   onBack,
   onEdit,
   onDelete,
+  onStart,
 }: RoutineDetailProps) {
   const storage = useStorage();
   const [routine, setRoutine] = useState<Routine | null>(null);
@@ -85,6 +71,10 @@ function RoutineDetail({
         )}
       </div>
 
+      <Button className="w-full" onClick={() => onStart(routine)}>
+        Start workout
+      </Button>
+
       <div className="flex gap-2">
         <Button
           variant="secondary"
@@ -116,7 +106,7 @@ function RoutineDetail({
               <ol className="mt-2 flex flex-col gap-1">
                 {exercise.sets.map((set) => (
                   <li key={set.id} className="text-sm text-ink-2">
-                    {set.order + 1}. {formatSet(set)}
+                    {set.order + 1}. {formatSetDefinition(set)}
                   </li>
                 ))}
               </ol>

@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
 import type { Routine } from '../../types/models';
+import { createWorkoutSession } from '../../types/factories';
+import WorkoutSessionView from '../workout/WorkoutSessionView';
 import RoutineDetail from './RoutineDetail';
 import RoutineEditor from './RoutineEditor';
 
 type Mode =
   | { kind: 'list' }
   | { kind: 'editor'; routine: Routine | null }
-  | { kind: 'detail'; routineId: string };
+  | { kind: 'detail'; routineId: string }
+  | { kind: 'workout'; sessionId: string };
 
 function RoutinesHome() {
   const storage = useStorage();
@@ -58,6 +61,12 @@ function RoutinesHome() {
     setMode({ kind: 'list' });
   }
 
+  async function handleStartWorkout(routine: Routine) {
+    const session = createWorkoutSession(routine);
+    await storage.upsertSession(session);
+    setMode({ kind: 'workout', sessionId: session.id });
+  }
+
   if (mode.kind === 'editor') {
     return (
       <RoutineEditor
@@ -79,6 +88,19 @@ function RoutinesHome() {
         onDelete={(id) => {
           void handleDelete(id);
         }}
+        onStart={(routine) => {
+          void handleStartWorkout(routine);
+        }}
+      />
+    );
+  }
+
+  if (mode.kind === 'workout') {
+    return (
+      <WorkoutSessionView
+        sessionId={mode.sessionId}
+        onBack={() => setMode({ kind: 'list' })}
+        onFinish={() => setMode({ kind: 'list' })}
       />
     );
   }

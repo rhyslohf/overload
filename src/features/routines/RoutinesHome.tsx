@@ -7,7 +7,7 @@ import RoutineEditor from './RoutineEditor';
 
 type Mode =
   | { kind: 'list' }
-  | { kind: 'editor'; routineId: string | null }
+  | { kind: 'editor'; routine: Routine | null }
   | { kind: 'detail'; routineId: string };
 
 function RoutinesHome() {
@@ -37,6 +37,10 @@ function RoutinesHome() {
     };
   }, [storage]);
 
+  function openEditor(routine: Routine | null) {
+    setMode({ kind: 'editor', routine });
+  }
+
   async function handleSave(routine: Routine) {
     await storage.upsertRoutine(routine);
     setSavedName(routine.name);
@@ -47,9 +51,17 @@ function RoutinesHome() {
     setMode({ kind: 'list' });
   }
 
+  async function handleDelete(id: string) {
+    await storage.deleteRoutine(id);
+    const updated = await storage.listRoutines();
+    setRoutines(updated);
+    setMode({ kind: 'list' });
+  }
+
   if (mode.kind === 'editor') {
     return (
       <RoutineEditor
+        initialRoutine={mode.routine}
         onSave={(routine) => {
           void handleSave(routine);
         }}
@@ -63,6 +75,10 @@ function RoutinesHome() {
       <RoutineDetail
         routineId={mode.routineId}
         onBack={() => setMode({ kind: 'list' })}
+        onEdit={openEditor}
+        onDelete={(id) => {
+          void handleDelete(id);
+        }}
       />
     );
   }
@@ -71,10 +87,7 @@ function RoutinesHome() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Routines</h1>
-        <Button
-          variant="primary"
-          onClick={() => setMode({ kind: 'editor', routineId: null })}
-        >
+        <Button variant="primary" onClick={() => openEditor(null)}>
           New routine
         </Button>
       </div>

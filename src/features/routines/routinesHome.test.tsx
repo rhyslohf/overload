@@ -331,3 +331,55 @@ describe('RoutinesHome — list & select saved routines', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('RoutinesHome — edit & delete a routine', () => {
+  async function saveRoutine(
+    user: ReturnType<typeof userEvent.setup>,
+    name: string,
+  ) {
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), name);
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+  }
+
+  it('edits a routine name through the detail view', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await saveRoutine(user, 'Push Day');
+    await user.click(screen.getByRole('button', { name: /Push Day/ }));
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Edit routine' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Routine name/)).toHaveValue('Push Day');
+
+    await user.clear(screen.getByLabelText(/Routine name/));
+    await user.type(screen.getByLabelText(/Routine name/), 'Upper Push');
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      expect(routines[0].name).toBe('Upper Push');
+    });
+  });
+
+  it('deletes a routine', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await saveRoutine(user, 'Push Day');
+    await user.click(screen.getByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete Push Day' }),
+    );
+
+    expect(
+      await screen.findByText('No routines yet — build your first one.'),
+    ).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await storage.listRoutines()).toEqual([]);
+    });
+  });
+});

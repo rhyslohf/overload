@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 interface RoutineDetailProps {
   routineId: string;
   onBack: () => void;
+  onEdit: (routine: Routine) => void;
+  onDelete: (routineId: string) => void;
 }
 
 function formatSet(set: Routine['exercises'][number]['sets'][number]): string {
@@ -21,7 +23,12 @@ function formatSet(set: Routine['exercises'][number]['sets'][number]): string {
  * sets). Phase 1 item 6 — "select one" lands here; edit & delete buttons
  * arrive in item 7.
  */
-function RoutineDetail({ routineId, onBack }: RoutineDetailProps) {
+function RoutineDetail({
+  routineId,
+  onBack,
+  onEdit,
+  onDelete,
+}: RoutineDetailProps) {
   const storage = useStorage();
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -67,6 +74,24 @@ function RoutineDetail({ routineId, onBack }: RoutineDetailProps) {
         {routine.description && (
           <p className="text-sm text-ink-2">{routine.description}</p>
         )}
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant="secondary"
+          className="flex-1"
+          onClick={() => onEdit(routine)}
+        >
+          Edit
+        </Button>
+        <Button
+          variant="danger"
+          className="flex-1"
+          onClick={() => onDelete(routine.id)}
+          aria-label={`Delete ${routine.name}`}
+        >
+          Delete
+        </Button>
       </div>
 
       <ol className="flex flex-col gap-3">

@@ -130,6 +130,13 @@ function SetList({ sets, onChange }: SetListProps) {
     return roundToIncrement((source.targetWeightKg * percentage.percent) / 100);
   }
 
+  /** §4.1: the reference must point to an earlier set in this exercise. */
+  function sourceIsValid(index: number): boolean {
+    const ref = sets[index].percentageOf?.sourceSetId;
+    if (!ref) return false;
+    return sets.slice(0, index).some((s) => s.id === ref);
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold text-ink-2">Sets</h3>
@@ -307,9 +314,7 @@ function SetList({ sets, onChange }: SetListProps) {
 
           {set.weightMode === 'percentageOfSet' && (
             <div className="flex flex-col gap-2 rounded-lg border border-line/70 bg-panel p-3">
-              <p className="text-sm font-semibold text-ink-2">
-                Percent of set
-              </p>
+              <p className="text-sm font-semibold text-ink-2">Percent of set</p>
               {index === 0 || sets.length === 1 ? (
                 <p className="text-sm text-ink-3">
                   No earlier set to base this on — reorder a set before it
@@ -348,11 +353,20 @@ function SetList({ sets, onChange }: SetListProps) {
               )}
               {(() => {
                 const computed = computedWeight(index);
-                return computed != null ? (
-                  <p className="text-sm text-ink-2">
-                    Load {computed} kg
-                  </p>
-                ) : null;
+                if (computed != null) {
+                  return (
+                    <p className="text-sm text-ink-2">Load {computed} kg</p>
+                  );
+                }
+                if (set.percentageOf != null && !sourceIsValid(index)) {
+                  return (
+                    <p className="text-sm text-danger">
+                      The base set is missing or after this set — reorder a set
+                      before it first.
+                    </p>
+                  );
+                }
+                return null;
               })()}
             </div>
           )}

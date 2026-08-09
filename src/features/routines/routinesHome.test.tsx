@@ -461,8 +461,6 @@ describe('RoutinesHome — percentage-of-set', () => {
       screen.getByRole('switch', { name: /Set 2 percent of set/ }),
     );
 
-    const source = screen.getByLabelText(/Set 2 based on/);
-    expect(source.value).not.toBe('');
     const option = screen.getByRole('option', { name: /Set 1 \(100 kg\)/ });
     expect((option as HTMLOptionElement).selected).toBe(true);
     expect(screen.getByText(/Load 80 kg/)).toBeInTheDocument();
@@ -516,6 +514,61 @@ describe('RoutinesHome — percentage-of-set', () => {
     await user.clear(screen.getByRole('spinbutton', { name: /percent/ }));
 
     expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();
+  });
+
+  it('disables Save when reordering moves the base set after the percentage set', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.click(
+      screen.getByRole('switch', { name: /Set 3 percent of set/ }),
+    );
+    // The base is Set 2; moving it below Set 3 makes the reference invalid.
+    await user.click(screen.getByRole('button', { name: /Move set 2 down/ }));
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();
+    expect(
+      screen.getByText(/base set is missing or after this set/),
+    ).toBeInTheDocument();
+  });
+
+  it('disables Save when the base set is removed', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.click(
+      screen.getByRole('switch', { name: /Set 3 percent of set/ }),
+    );
+    await user.click(screen.getByRole('button', { name: /Remove set 2/ }));
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();
+    expect(
+      screen.getByText(/base set is missing or after this set/),
+    ).toBeInTheDocument();
+  });
+
+  it('lets the user repoint a broken percentage reference to a valid earlier set', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithTwoSets(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 3 reps/), '8');
+    await user.click(
+      screen.getByRole('switch', { name: /Set 3 percent of set/ }),
+    );
+    // Remove the immediate base (Set 2); Set 3 is renumbered Set 2 and may
+    // still reference Set 1.
+    await user.click(screen.getByRole('button', { name: /Remove set 2/ }));
+
+    const select = screen.getByLabelText(/Set 2 based on/);
+    await user.selectOptions(select, select.querySelector('option')!.value);
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeEnabled();
   });
 });
 

@@ -49,31 +49,37 @@ function RoutineEditor({
       cancelled = true;
     };
   }, [storage]);
-const nameValid = name.trim().length > 0;
+  const nameValid = name.trim().length > 0;
   const exercisesComplete = exercises.every(
     (exercise) =>
       exercise.name.trim() !== '' &&
-      exercise.sets.every((set) => {
+      exercise.sets.every((set, setIndex) => {
         // §4.1: Myorep sets need activation + mini-set config, no plain reps
         const repsOk = set.isMyorep
           ? set.toFailure ||
             (set.targetReps != null && set.targetReps > 0) ||
             (set.myorep?.activationRepTarget != null &&
               set.myorep.activationRepTarget > 0)
-          : set.toFailure ||
-            (set.targetReps != null && set.targetReps > 0);
+          : set.toFailure || (set.targetReps != null && set.targetReps > 0);
         // §4.1: Percentage sets derive weight from a source set
         const weightOk =
           set.weightMode === 'percentageOfSet'
             ? set.percentageOf != null && set.percentageOf.percent > 0
             : set.targetWeightKg != null && set.targetWeightKg > 0;
+        // §4.1: a percentage source must be an earlier set in this exercise
+        const sourceOk =
+          set.weightMode !== 'percentageOfSet' ||
+          (set.percentageOf != null &&
+            exercise.sets
+              .slice(0, setIndex)
+              .some((s) => s.id === set.percentageOf?.sourceSetId));
         const myoOk =
           !set.isMyorep ||
           (set.myorep?.miniSetRepTarget != null &&
             set.myorep.miniSetRepTarget > 0 &&
             set.myorep.miniSetRestSeconds != null &&
             set.myorep.miniSetRestSeconds > 0);
-        return repsOk && weightOk && myoOk;
+        return repsOk && weightOk && sourceOk && myoOk;
       }),
   );
 

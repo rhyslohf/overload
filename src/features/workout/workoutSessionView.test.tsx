@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StorageProvider } from '../../components/StorageProvider';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
@@ -42,6 +42,10 @@ function routineWithSets(name: string): Routine {
 }
 
 describe('WorkoutSessionView — start a workout', () => {
+  const firstExercise = async () => {
+    const heading = await screen.findByRole('heading', { name: 'Bench Press' });
+    return heading.closest('li')!;
+  };
   it('starting a workout snapshots the routine into a session', async () => {
     const user = userEvent.setup();
     const storage = createLocalStorageAdapter(memoryStorage());
@@ -73,7 +77,7 @@ describe('WorkoutSessionView — start a workout', () => {
     });
   });
 
-  it('shows the planned sets for each snapshotted exercise', async () => {
+  it('shows a planned set row for each snapshotted set', async () => {
     const user = userEvent.setup();
     const storage = createLocalStorageAdapter(memoryStorage());
     await storage.upsertRoutine(routineWithSets('Push Day'));
@@ -85,10 +89,101 @@ describe('WorkoutSessionView — start a workout', () => {
     );
 
     expect(await screen.findByText('Bench Press')).toBeInTheDocument();
-    expect(screen.getByText('1. 10 × 100 kg')).toBeInTheDocument();
-    expect(screen.getByText('2. 8 × 90 kg')).toBeInTheDocument();
+    expect(screen.getAllByText('Set 1')).toHaveLength(2);
+    expect(screen.getAllByText('Set 2')).toHaveLength(1);
     expect(screen.getByText('Lat Pulldown')).toBeInTheDocument();
-    expect(screen.getByText('1. 12 × 60 kg')).toBeInTheDocument();
+  });
+
+  it('logs a set with weight, reps and difficulty and saves it', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const weight = (
+      await within(exercise).findAllByLabelText(/Weight \(kg\)/)
+    )[0];
+    const reps = within(exercise).getAllByLabelText(/Reps/)[0];
+    await user.clear(weight);
+    await user.type(weight, '102.5');
+    await user.clear(reps);
+    await user.type(reps, '8');
+    await user.click(
+      within(exercise).getAllByRole('button', {
+        name: /Difficulty 4/,
+      })[0],
+    );
+    await user.click(
+      within(exercise).getAllByRole('button', { name: 'Log set' })[0],
+    );
+
+    expect(
+      await screen.findByText(/Logged · 102\.5 kg × 8 · difficulty 4/),
+    ).toBeInTheDocument();
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      const routine = (await storage.listRoutines())[0];
+      const set = sessions[0].exercises[0].sets[0];
+      expect(set.setDefId).toBe(routine.exercises[0].sets[0].id);
+      expect(set).toMatchObject({
+        weightKg: 102.5,
+        reps: 8,
+        difficulty: 4,
+      });
+      expect(set.completedAt).toBeTruthy();
+    });
+  });
+
+  it('keeps Log set disabled until difficulty and numbers are filled in', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const logButton = (
+      await within(exercise).findAllByRole('button', { name: 'Log set' })
+    )[0];
+    expect(logButton).toBeDisabled();
+
+    await user.click(
+      within(exercise).getAllByRole('button', {
+        name: /Difficulty 3/,
+      })[0],
+    );
+    expect(logButton).toBeEnabled();
+  });
+
+  it('prefills a to-failure set with a blank reps field', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    const routine = routineWithSets('Push Day');
+    routine.exercises[0].sets = [
+      createSetDefinition(0, { toFailure: true, targetWeightKg: 100 }),
+    ];
+    await storage.upsertRoutine(routine);
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const reps = (await within(exercise).findAllByLabelText(/Reps/))[0];
+    expect((reps as HTMLInputElement).value).toBe('');
   });
 
   it('returns to the routine list via Back', async () => {

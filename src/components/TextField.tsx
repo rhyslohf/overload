@@ -6,6 +6,7 @@ interface TextFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   autoComplete?: string;
   maxLength?: number;
   type?: 'text' | 'number';
@@ -24,6 +25,7 @@ function TextField({
   onChange,
   placeholder,
   required,
+  disabled,
   autoComplete,
   maxLength,
   type = 'text',
@@ -55,6 +57,7 @@ function TextField({
         max={max}
         step={step}
         required={required}
+        disabled={disabled}
         className="min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-base text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </div>

@@ -17,11 +17,11 @@ function renderRoutines(): StorageService {
 }
 
 describe('RoutinesHome — create routine', () => {
-  it('shows the empty state plus a New routine action', () => {
+  it('shows the empty state plus a New routine action', async () => {
     renderRoutines();
 
     expect(
-      screen.getByText('No routines yet — build your first one.'),
+      await screen.findByText('No routines yet — build your first one.'),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'New routine' }),
@@ -271,5 +271,63 @@ describe('RoutinesHome — add/remove/reorder sets', () => {
 
     await user.type(screen.getByLabelText(/Set 1 weight/), '60');
     expect(screen.getByRole('button', { name: 'Save routine' })).toBeEnabled();
+  });
+});
+
+describe('RoutinesHome — list & select saved routines', () => {
+  async function saveRoutine(
+    user: ReturnType<typeof userEvent.setup>,
+    name: string,
+  ) {
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), name);
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+  }
+
+  it('lists saved routines with their exercise count', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await saveRoutine(user, 'Push Day');
+    await saveRoutine(user, 'Leg Day');
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      expect(routines).toHaveLength(2);
+    });
+
+    expect(
+      screen.getByRole('button', { name: /Push Day/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Leg Day/ })).toBeInTheDocument();
+  });
+
+  it('selecting a routine shows its detail view', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await saveRoutine(user, 'Push Day');
+
+    await user.click(screen.getByRole('button', { name: /Push Day/ }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Push Day' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /Routines/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('back from detail returns to the list', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await saveRoutine(user, 'Push Day');
+    await user.click(screen.getByRole('button', { name: /Push Day/ }));
+    await user.click(screen.getByRole('button', { name: /Routines/ }));
+
+    expect(
+      screen.getByRole('button', { name: /Push Day/ }),
+    ).toBeInTheDocument();
   });
 });

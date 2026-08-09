@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 
 describe('App shell', () => {
-  it('renders the brand and lands on the Routines view', () => {
+  it('renders the brand and lands on the Routines view', async () => {
     render(<App />);
 
     expect(screen.getByText('Workout Tracker')).toBeInTheDocument();
     expect(
-      screen.getByText('No routines yet — build your first one.'),
+      await screen.findByText('No routines yet — build your first one.'),
     ).toBeInTheDocument();
   });
 

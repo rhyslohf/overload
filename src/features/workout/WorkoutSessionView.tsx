@@ -89,6 +89,45 @@ function WorkoutSessionView({
       reps: input.reps,
       difficulty: input.difficulty,
     });
+    appendLoggedSet(exerciseIndex, logged);
+  }
+
+  // §4.2: myorep mini-sets are reps-only adds pinned to the already-logged
+  // activation set of the same definition (weight = the activation's weight).
+  function handleAddMiniSet(
+    exerciseIndex: number,
+    setDef: SetDefinition,
+    reps: number,
+  ) {
+    const exercise = current.exercises[exerciseIndex];
+    const existing = findLoggedSet(exercise, setDef);
+    if (existing == null) return;
+    const next: WorkoutSession = {
+      ...current,
+      exercises: current.exercises.map((exercise, i) =>
+        i === exerciseIndex
+          ? {
+              ...exercise,
+              sets: exercise.sets.map((s) =>
+                s.setDefId === setDef.id
+                  ? {
+                      ...s,
+                      myorepMiniSets: [...(s.myorepMiniSets ?? []), { reps }],
+                    }
+                  : s,
+              ),
+            }
+          : exercise,
+      ),
+    };
+    setSession(next);
+    void storage.upsertSession(next);
+  }
+
+  function appendLoggedSet(
+    exerciseIndex: number,
+    logged: WorkoutSession['exercises'][number]['sets'][number],
+  ) {
     const next: WorkoutSession = {
       ...current,
       exercises: current.exercises.map((exercise, i) =>
@@ -161,6 +200,9 @@ function WorkoutSessionView({
                           set,
                         )}
                         onLog={(input) => handleLog(exerciseIndex, set, input)}
+                        onAddMiniSet={(miniReps) =>
+                          handleAddMiniSet(exerciseIndex, set, miniReps)
+                        }
                       />
                     </li>
                   ))}

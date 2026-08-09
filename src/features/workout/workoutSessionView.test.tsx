@@ -186,6 +186,121 @@ describe('WorkoutSessionView — start a workout', () => {
     expect((reps as HTMLInputElement).value).toBe('');
   });
 
+  it('logs a myorep activation set then adds repeatable mini-sets', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    const routine = routineWithSets('Push Day');
+    routine.exercises[0].sets = [
+      createSetDefinition(0, {
+        isMyorep: true,
+        myorep: {
+          activationRepTarget: 12,
+          miniSetRepTarget: 3,
+          miniSetRestSeconds: 20,
+          maxMiniSets: 5,
+        },
+        targetWeightKg: 100,
+      }),
+    ];
+    await storage.upsertRoutine(routine);
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const reps = (await within(exercise).findAllByLabelText(/Reps/))[0];
+    await user.clear(reps);
+    await user.type(reps, '12');
+    await user.click(
+      within(exercise).getAllByRole('button', { name: /Difficulty 3/ })[0],
+    );
+    await user.click(
+      within(exercise).getAllByRole('button', { name: 'Log set' })[0],
+    );
+
+    expect(
+      await within(exercise).findByText(/Activation · 100 kg × 12/),
+    ).toBeInTheDocument();
+
+    const miniReps = (
+      await within(exercise).findAllByLabelText(/Mini-set reps/)
+    )[0];
+    await user.clear(miniReps);
+    await user.type(miniReps, '4');
+    await user.click(
+      within(exercise).getByRole('button', { name: 'Add mini-set' }),
+    );
+    await user.clear(miniReps);
+    await user.type(miniReps, '3');
+    await user.click(
+      within(exercise).getByRole('button', { name: 'Add mini-set' }),
+    );
+
+    expect(
+      await within(exercise).findByText('Mini-set 1 · 4 reps'),
+    ).toBeInTheDocument();
+    expect(
+      within(exercise).getByText('Mini-set 2 · 3 reps'),
+    ).toBeInTheDocument();
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      const set = sessions[0].exercises[0].sets[0];
+      expect(set.myorepMiniSets).toEqual([{ reps: 4 }, { reps: 3 }]);
+      expect(set.weightKg).toBe(100);
+      expect(set.reps).toBe(12);
+    });
+  });
+
+  it('marks a myorep set done to collapse the mini-set adder', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    const routine = routineWithSets('Push Day');
+    routine.exercises[0].sets = [
+      createSetDefinition(0, {
+        isMyorep: true,
+        myorep: {
+          activationRepTarget: 12,
+          miniSetRepTarget: 3,
+          miniSetRestSeconds: 20,
+          maxMiniSets: 5,
+        },
+        targetWeightKg: 100,
+      }),
+    ];
+    await storage.upsertRoutine(routine);
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const reps = (await within(exercise).findAllByLabelText(/Reps/))[0];
+    await user.clear(reps);
+    await user.type(reps, '12');
+    await user.click(
+      within(exercise).getAllByRole('button', { name: /Difficulty 3/ })[0],
+    );
+    await user.click(
+      within(exercise).getAllByRole('button', { name: 'Log set' })[0],
+    );
+    await user.click(
+      await within(exercise).findByRole('button', { name: 'Mark myorep done' }),
+    );
+
+    expect(
+      within(exercise).queryByRole('button', { name: 'Add mini-set' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await within(exercise).findByText(/Logged · 100 kg × 12/),
+    ).toBeInTheDocument();
+  });
+
   it('returns to the routine list via Back', async () => {
     const user = userEvent.setup();
     const storage = createLocalStorageAdapter(memoryStorage());

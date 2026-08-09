@@ -438,7 +438,9 @@ describe('RoutinesHome — myorep toggle & config', () => {
 });
 
 describe('RoutinesHome — percentage-of-set', () => {
-  async function newRoutineWithTwoSets(user: ReturnType<typeof userEvent.setup>) {
+  async function newRoutineWithTwoSets(
+    user: ReturnType<typeof userEvent.setup>,
+  ) {
     await user.click(screen.getByRole('button', { name: 'New routine' }));
     await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
     await user.click(screen.getByRole('button', { name: 'Add exercise' }));
@@ -455,9 +457,11 @@ describe('RoutinesHome — percentage-of-set', () => {
     renderRoutines();
 
     await newRoutineWithTwoSets(user);
-    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+    await user.click(
+      screen.getByRole('switch', { name: /Set 2 percent of set/ }),
+    );
 
-    const source = screen.getByLabelText(/Set 2 based on/) as HTMLSelectElement;
+    const source = screen.getByLabelText(/Set 2 based on/);
     expect(source.value).not.toBe('');
     const option = screen.getByRole('option', { name: /Set 1 \(100 kg\)/ });
     expect((option as HTMLOptionElement).selected).toBe(true);
@@ -469,7 +473,9 @@ describe('RoutinesHome — percentage-of-set', () => {
     const storage = renderRoutines();
 
     await newRoutineWithTwoSets(user);
-    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+    await user.click(
+      screen.getByRole('switch', { name: /Set 2 percent of set/ }),
+    );
     await user.click(screen.getByRole('button', { name: 'Save routine' }));
 
     await waitFor(async () => {
@@ -489,7 +495,9 @@ describe('RoutinesHome — percentage-of-set', () => {
     renderRoutines();
 
     await newRoutineWithTwoSets(user);
-    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+    await user.click(
+      screen.getByRole('switch', { name: /Set 2 percent of set/ }),
+    );
 
     await user.clear(screen.getByRole('spinbutton', { name: /percent/ }));
     await user.type(screen.getByRole('spinbutton', { name: /percent/ }), '50');
@@ -502,7 +510,9 @@ describe('RoutinesHome — percentage-of-set', () => {
     renderRoutines();
 
     await newRoutineWithTwoSets(user);
-    await user.click(screen.getByRole('switch', { name: /Set 2 percent of set/ }));
+    await user.click(
+      screen.getByRole('switch', { name: /Set 2 percent of set/ }),
+    );
     await user.clear(screen.getByRole('spinbutton', { name: /percent/ }));
 
     expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();

@@ -34,13 +34,21 @@ function RoutineEditor({
 
   const nameValid = name.trim().length > 0;
   const exercisesComplete = exercises.every(
-    (exercise) => exercise.name.trim() !== '',
+    (exercise) =>
+      exercise.name.trim() !== '' &&
+      exercise.sets.every(
+        (set) =>
+          set.targetReps != null &&
+          set.targetReps > 0 &&
+          set.targetWeightKg != null &&
+          set.targetWeightKg > 0,
+      ),
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!nameValid) return;
-    if (exercises.some((exercise) => exercise.name.trim() === '')) return;
+    if (!exercisesComplete) return;
 
     const savedExercises = renumber(
       exercises.map((exercise) => ({

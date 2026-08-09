@@ -182,3 +182,94 @@ describe('RoutinesHome — add/remove/reorder exercises', () => {
     expect(screen.getByRole('button', { name: 'Save routine' })).toBeEnabled();
   });
 });
+
+describe('RoutinesHome — add/remove/reorder sets', () => {
+  async function newRoutineWithExercise(
+    user: ReturnType<typeof userEvent.setup>,
+  ) {
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Bench Press');
+  }
+
+  it('adds sets with reps and weight, saving them in order', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await newRoutineWithExercise(user);
+
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 2 reps/), '5');
+    await user.type(screen.getByLabelText(/Set 2 weight/), '80');
+
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      const sets = routines[0].exercises[0].sets;
+      expect(sets.map((s) => s.targetReps)).toEqual([10, 5]);
+      expect(sets.map((s) => s.targetWeightKg)).toEqual([60, 80]);
+      expect(sets.map((s) => s.order)).toEqual([0, 1]);
+    });
+  });
+
+  it('reorders sets with the move buttons', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithExercise(user);
+
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 2 reps/), '5');
+    await user.type(screen.getByLabelText(/Set 2 weight/), '80');
+
+    await user.click(screen.getByRole('button', { name: 'Move set 2 up' }));
+
+    expect(screen.getByLabelText(/Set 1 reps/)).toHaveValue(5);
+    expect(screen.getByLabelText(/Set 1 weight/)).toHaveValue(80);
+    expect(screen.getByLabelText(/Set 2 reps/)).toHaveValue(10);
+    expect(screen.getByLabelText(/Set 2 weight/)).toHaveValue(60);
+  });
+
+  it('removes a set', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithExercise(user);
+
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 2 reps/), '5');
+    await user.type(screen.getByLabelText(/Set 2 weight/), '80');
+
+    await user.click(screen.getByRole('button', { name: 'Remove set 1' }));
+
+    expect(screen.getByLabelText(/Set 1 reps/)).toHaveValue(5);
+    expect(screen.queryByLabelText(/Set 2 reps/)).not.toBeInTheDocument();
+  });
+
+  it('keeps Save disabled until every set has reps and weight', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithExercise(user);
+
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeEnabled();
+  });
+});

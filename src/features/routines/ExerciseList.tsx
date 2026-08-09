@@ -1,8 +1,9 @@
 import Button from '../../components/Button';
 import TextField from '../../components/TextField';
 import { createRoutineExercise } from '../../types/factories';
-import type { RoutineExercise } from '../../types/models';
+import type { RoutineExercise, SetDefinition } from '../../types/models';
 import { moveItem, removeAt, renumber } from '../../utils/order';
+import SetList from './SetList';
 
 interface ExerciseListProps {
   exercises: RoutineExercise[];
@@ -33,6 +34,19 @@ function ExerciseList({ exercises, onChange }: ExerciseListProps) {
 
   function handleRemove(index: number) {
     onChange(removeAt(exercises, index));
+  }
+
+  function handleExercisePatch(
+    index: number,
+    partial: Partial<RoutineExercise>,
+  ) {
+    const next = [...exercises];
+    next[index] = { ...next[index], ...partial };
+    onChange(next);
+  }
+
+  function handleSetsChange(index: number, sets: SetDefinition[]) {
+    handleExercisePatch(index, { sets });
   }
 
   function handleAdd() {
@@ -98,6 +112,11 @@ function ExerciseList({ exercises, onChange }: ExerciseListProps) {
               onChange={(value) => handleRename(index, value)}
               placeholder="e.g. Bench Press"
               maxLength={60}
+            />
+
+            <SetList
+              sets={exercise.sets}
+              onChange={(sets) => handleSetsChange(index, sets)}
             />
           </div>
         );

@@ -9,6 +9,8 @@ interface TextFieldProps {
   autoComplete?: string;
   maxLength?: number;
   type?: 'text' | 'number';
+  min?: number;
+  step?: number;
 }
 
 /**
@@ -24,6 +26,8 @@ function TextField({
   autoComplete,
   maxLength,
   type = 'text',
+  min,
+  step,
 }: TextFieldProps) {
   const id = useId();
 
@@ -45,6 +49,8 @@ function TextField({
         placeholder={placeholder}
         autoComplete={autoComplete}
         maxLength={maxLength}
+        min={min}
+        step={step}
         required={required}
         className="min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-base text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       />

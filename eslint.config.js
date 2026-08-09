@@ -52,5 +52,14 @@ export default tseslint.config(
       '@typescript-eslint/require-await': 'off',
     },
   },
+  {
+    // Context providers conventionally co-locate their hook
+    // (`useStorage`) with the component — that's not a fast-refresh hazard
+    // worth splitting files over.
+    files: ['src/**/*Provider.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
   prettier,
 );

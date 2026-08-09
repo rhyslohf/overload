@@ -1,0 +1,70 @@
+/**
+ * Design tokens — WORKOUT TRACKER
+ *
+ * Single source of truth for the app's visual language. Theme name: "Steel & Ember".
+ * Rationale (REQUIREMENTS.md §8): the app is used one-handed, in dim gym
+ * lighting, between sets. Dark-first background, high contrast, and ONE
+ * confident accent reserved for the primary action and active/success states.
+ * The amber ("ember") is a warm, high-visibility accent chosen deliberately —
+ * not the default neon-on-black cliché, not a marketing-palette lilac.
+ *
+ * Usage:
+ *  - These `:root` CSS variables are the committed truth.
+ *  - global.css maps them into Tailwind's theme (see @theme inline) so the
+ *    build uses them as utilities (bg-bg, text-ink, bg-accent, ...).
+ *  - Never hardcode a hex anywhere else.
+ */
+
+:root {
+  /* -- Palette (REQUIREMENTS.md §8: name 4–6 actual hex values) ------------ */
+  --wg-bg: #0e1116; /* page background — near-black blue-charcoal */
+  --wg-surface: #161b22; /* elevated panel */
+  --wg-surface-2: #1d242f; /* raised surface / pressed state */
+  --wg-border: #2a313d; /* hairline separators */
+  --wg-ink: #eef1f5; /* primary text — highest contrast */
+  --wg-ink-2: #a9b2bd; /* secondary text */
+  --wg-ink-3: #6e7a88; /* muted / disabled (never for actionable text) */
+  --wg-accent: #e8a33c; /* single accent — primary action, active, success */
+  --wg-accent-hi: #f6b854; /* accent on hover */
+  --wg-accent-ink: #1a1203; /* text on top of accent fills */
+  --wg-danger: #e05b5b; /* destructive actions only (delete / abandon) */
+
+  /* -- Type scale (REM, mobile-first) -------------------------------------- */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.75rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  /* Numbers are the hero (§8) — larger, tabular-figure display sizes. */
+  --text-number-sm: 1.25rem;
+  --text-number: 2rem;
+  --text-number-lg: 3rem;
+
+  --line-height-tight: 1.15;
+  --line-height-base: 1.4;
+  --line-height-loose: 1.6;
+
+  /* -- Spacing (4px base — Tailwind derives its scale from this) ----------- */
+  --space-base: 0.25rem;
+
+  /* -- Radius --------------------------------------------------------------- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* -- Motion (purposeful only, §8) ----------------------------------------- */
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+  --ease-default: cubic-bezier(0.2, 0.75, 0.3, 1);
+  --ease-pulse: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* -- Touch ---------------------------------------------------------------- */
+  --tap-min: 44px; /* accessible tap target floor (§8 / NFR "Accessible") */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

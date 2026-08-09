@@ -1,13 +1,18 @@
 import Button from '../../components/Button';
-import TextField from '../../components/TextField';
 import { createRoutineExercise } from '../../types/factories';
-import type { RoutineExercise, SetDefinition } from '../../types/models';
+import type {
+  ExerciseEntry,
+  RoutineExercise,
+  SetDefinition,
+} from '../../types/models';
 import { moveItem, removeAt, renumber } from '../../utils/order';
+import ExerciseNameField from './ExerciseNameField';
 import SetList from './SetList';
 
 interface ExerciseListProps {
   exercises: RoutineExercise[];
   onChange: (exercises: RoutineExercise[]) => void;
+  suggestions: ExerciseEntry[];
 }
 
 function displayName(exercise: RoutineExercise, index: number): string {
@@ -21,7 +26,7 @@ function displayName(exercise: RoutineExercise, index: number): string {
  * sets back up through `onChange`. Blank-named exercises are kept in the
  * list for the editor to fill in, and filtered on save.
  */
-function ExerciseList({ exercises, onChange }: ExerciseListProps) {
+function ExerciseList({ exercises, onChange, suggestions }: ExerciseListProps) {
   function handleRename(index: number, name: string) {
     const next = [...exercises];
     next[index] = { ...next[index], name };
@@ -106,12 +111,12 @@ function ExerciseList({ exercises, onChange }: ExerciseListProps) {
                 Remove
               </Button>
             </div>
-            <TextField
+            <ExerciseNameField
               label={`Exercise ${index + 1}`}
               value={exercise.name}
               onChange={(value) => handleRename(index, value)}
+              suggestions={suggestions}
               placeholder="e.g. Bench Press"
-              maxLength={60}
             />
 
             <SetList

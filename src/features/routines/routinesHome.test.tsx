@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { StorageProvider } from '../../components/StorageProvider';
 import type { StorageService } from '../../services/storage';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
+import type { Routine } from '../../types/models';
+import { createRoutine } from '../../types/factories';
 import RoutinesHome from './RoutinesHome';
 import { memoryStorage } from '../../test/memoryStorage';
 
@@ -14,6 +16,28 @@ function renderRoutines(): StorageService {
     </StorageProvider>,
   );
   return storage;
+}
+
+async function seedRoutine(
+  storage: StorageService,
+  name: string,
+  exerciseName?: string,
+) {
+  const routine: Routine = {
+    ...createRoutine({ name }),
+    exercises: exerciseName
+      ? [
+          {
+            id: `ex-seed-${name}`,
+            exerciseId: `ex-id-${exerciseName}`,
+            name: exerciseName,
+            order: 0,
+            sets: [],
+          },
+        ]
+      : [],
+  };
+  await storage.upsertRoutine(routine);
 }
 
 describe('RoutinesHome — create routine', () => {
@@ -381,5 +405,40 @@ describe('RoutinesHome — edit & delete a routine', () => {
     await waitFor(async () => {
       expect(await storage.listRoutines()).toEqual([]);
     });
+  });
+});
+
+describe('RoutinesHome — exercise-name autocomplete', () => {
+  it('suggests matching exercises from the library', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+    await seedRoutine(storage, 'Seeded', 'Bench Press');
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'ben');
+
+    expect(
+      await screen.findByRole('option', { name: 'Bench Press' }),
+    ).toBeInTheDocument();
+  });
+
+  it('picks a suggestion by click into the exercise name', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+    await seedRoutine(storage, 'Seeded', 'Overhead Press');
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'over');
+
+    const option = await screen.findByRole('option', {
+      name: 'Overhead Press',
+    });
+    await user.click(option);
+
+    expect(screen.getByLabelText(/Exercise 1/)).toHaveValue('Overhead Press');
   });
 });

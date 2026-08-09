@@ -1,8 +1,13 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Button from '../../components/Button';
 import TextField from '../../components/TextField';
+import { useStorage } from '../../components/StorageProvider';
 import { createRoutine } from '../../types/factories';
-import type { Routine, RoutineExercise } from '../../types/models';
+import type {
+  ExerciseEntry,
+  Routine,
+  RoutineExercise,
+} from '../../types/models';
 import { exerciseIdForName } from '../../utils/exercise';
 import { renumber } from '../../utils/order';
 import ExerciseList from './ExerciseList';
@@ -23,6 +28,7 @@ function RoutineEditor({
   onSave,
   onCancel,
 }: RoutineEditorProps) {
+  const storage = useStorage();
   const editing = initialRoutine != null;
   const [name, setName] = useState(initialRoutine?.name ?? '');
   const [description, setDescription] = useState(
@@ -31,6 +37,18 @@ function RoutineEditor({
   const [exercises, setExercises] = useState<RoutineExercise[]>(
     initialRoutine?.exercises ?? [],
   );
+  const [suggestions, setSuggestions] = useState<ExerciseEntry[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void storage.getExerciseLibrary().then((library) => {
+      if (cancelled) return;
+      setSuggestions(library);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storage]);
 
   const nameValid = name.trim().length > 0;
   const exercisesComplete = exercises.every(
@@ -107,7 +125,11 @@ function RoutineEditor({
 
       <hr className="border-line" />
 
-      <ExerciseList exercises={exercises} onChange={setExercises} />
+      <ExerciseList
+        exercises={exercises}
+        onChange={setExercises}
+        suggestions={suggestions}
+      />
 
       <div className="mt-auto flex flex-col gap-2">
         <Button

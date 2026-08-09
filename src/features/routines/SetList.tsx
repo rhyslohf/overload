@@ -21,9 +21,9 @@ function parseNumber(raw: string): number | undefined {
 }
 
 /**
- * Ordered list of an exercise's sets. Phase 1 keeps sets plain: target reps
- * and target weight (kg) only — advanced toggles arrive in Phase 2. Immutable
- * add/remove/reorder through the order utils.
+ * Ordered list of an exercise's sets. Phase 1 kept sets plain (reps +
+ * weight only); Phase 2 adds the advanced toggles (to-failure, myorep,
+ * percentage). Immutable add/remove/reorder through the order utils.
  */
 function SetList({ sets, onChange }: SetListProps) {
   function handlePatch(index: number, partial: Partial<SetDefinition>) {
@@ -42,6 +42,15 @@ function SetList({ sets, onChange }: SetListProps) {
 
   function handleAdd() {
     onChange(renumber([...sets, createSetDefinition(sets.length)]));
+  }
+
+  function handleToFailureToggle(index: number) {
+    const set = sets[index];
+    handlePatch(index, {
+      toFailure: !set.toFailure,
+      // §4.1: target reps are omitted when To-Failure is on
+      targetReps: set.toFailure ? set.targetReps : undefined,
+    });
   }
 
   return (
@@ -89,30 +98,74 @@ function SetList({ sets, onChange }: SetListProps) {
             </Button>
           </div>
 
-          <div className="flex gap-2">
-            <TextField
-              label={`Set ${index + 1} reps`}
-              type="number"
-              min={1}
-              step={1}
-              value={numberInput(set.targetReps)}
-              onChange={(raw) =>
-                handlePatch(index, { targetReps: parseNumber(raw) })
-              }
-              placeholder="10"
-            />
-            <TextField
-              label={`Set ${index + 1} weight (kg)`}
-              type="number"
-              min={0}
-              step={0.5}
-              value={numberInput(set.targetWeightKg)}
-              onChange={(raw) =>
-                handlePatch(index, { targetWeightKg: parseNumber(raw) })
-              }
-              placeholder="60"
-            />
-          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={set.toFailure}
+            aria-label={`Set ${index + 1} to failure`}
+            onClick={() => handleToFailureToggle(index)}
+            className={`flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors duration-100 ${
+              set.toFailure
+                ? 'border-accent/50 bg-accent/10 text-accent-hi'
+                : 'border-line/70 bg-panel text-ink-2'
+            }`}
+          >
+            To failure
+            <span
+              aria-hidden="true"
+              className={`h-5 w-9 rounded-full p-0.5 transition-colors duration-100 ${
+                set.toFailure ? 'bg-accent' : 'bg-line'
+              }`}
+            >
+              <span
+                className={`block h-4 w-4 rounded-full bg-panel transition-transform duration-100 ${
+                  set.toFailure ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </span>
+          </button>
+
+          {!set.toFailure && (
+            <div className="flex gap-2">
+              <TextField
+                label={`Set ${index + 1} reps`}
+                type="number"
+                min={1}
+                step={1}
+                value={numberInput(set.targetReps)}
+                onChange={(raw) =>
+                  handlePatch(index, { targetReps: parseNumber(raw) })
+                }
+                placeholder="10"
+              />
+              <TextField
+                label={`Set ${index + 1} weight (kg)`}
+                type="number"
+                min={0}
+                step={0.5}
+                value={numberInput(set.targetWeightKg)}
+                onChange={(raw) =>
+                  handlePatch(index, { targetWeightKg: parseNumber(raw) })
+                }
+                placeholder="60"
+              />
+            </div>
+          )}
+          {set.toFailure && (
+            <div className="flex gap-2">
+              <TextField
+                label={`Set ${index + 1} weight (kg)`}
+                type="number"
+                min={0}
+                step={0.5}
+                value={numberInput(set.targetWeightKg)}
+                onChange={(raw) =>
+                  handlePatch(index, { targetWeightKg: parseNumber(raw) })
+                }
+                placeholder="60"
+              />
+            </div>
+          )}
         </div>
       ))}
 

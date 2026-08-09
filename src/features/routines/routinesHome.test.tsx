@@ -298,6 +298,58 @@ describe('RoutinesHome — add/remove/reorder sets', () => {
   });
 });
 
+describe('RoutinesHome — to-failure toggle', () => {
+  async function newRoutineWithExercise(
+    user: ReturnType<typeof userEvent.setup>,
+  ) {
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Bench Press');
+  }
+
+  it('hides the reps field and saves a to-failure set', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await newRoutineWithExercise(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+    await user.click(screen.getByRole('switch', { name: /Set 1 to failure/ }));
+
+    expect(screen.queryByLabelText(/Set 1 reps/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: /Set 1 to failure/ }),
+    ).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      const set = routines[0].exercises[0].sets[0];
+      expect(set.toFailure).toBe(true);
+      expect(set.targetReps).toBeUndefined();
+      expect(set.targetWeightKg).toBe(60);
+    });
+  });
+
+  it('shows reps again after toggling off', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await newRoutineWithExercise(user);
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.click(screen.getByRole('switch', { name: /Set 1 to failure/ }));
+    await user.click(screen.getByRole('switch', { name: /Set 1 to failure/ }));
+
+    expect(screen.getByLabelText(/Set 1 reps/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: /Set 1 to failure/ }),
+    ).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
 describe('RoutinesHome — list & select saved routines', () => {
   async function saveRoutine(
     user: ReturnType<typeof userEvent.setup>,

@@ -54,13 +54,16 @@ function RoutineEditor({
   const exercisesComplete = exercises.every(
     (exercise) =>
       exercise.name.trim() !== '' &&
-      exercise.sets.every(
-        (set) =>
-          set.targetReps != null &&
-          set.targetReps > 0 &&
-          set.targetWeightKg != null &&
-          set.targetWeightKg > 0,
-      ),
+      exercise.sets.every((set) => {
+        // §4.1: To-Failure sets have no target reps
+        const repsOk =
+          set.toFailure || (set.targetReps != null && set.targetReps > 0);
+        // §4.1: Percentage sets derive weight from a source set
+        const weightOk =
+          set.weightMode === 'percentageOfSet' ||
+          (set.targetWeightKg != null && set.targetWeightKg > 0);
+        return repsOk && weightOk;
+      }),
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

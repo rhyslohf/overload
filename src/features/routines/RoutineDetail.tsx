@@ -11,11 +11,12 @@ interface RoutineDetailProps {
 }
 
 function formatSet(set: Routine['exercises'][number]['sets'][number]): string {
+  const weight = set.targetWeightKg != null ? `${set.targetWeightKg} kg` : '—';
+  if (set.toFailure) return `To failure × ${weight}`;
   const reps = set.targetRepsMax
     ? `${set.targetReps}–${set.targetRepsMax}`
     : `${set.targetReps}`;
-  const weight = set.targetWeightKg != null ? `${set.targetWeightKg} kg` : '—';
-  return set.toFailure ? `${reps} reps to failure` : `${reps} × ${weight}`;
+  return `${reps} × ${weight}`;
 }
 
 /**

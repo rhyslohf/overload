@@ -3,6 +3,11 @@ import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
 import type { Routine, WorkoutSession } from '../../types/models';
 import { createWorkoutSession } from '../../types/factories';
+import {
+  deconflictRoutineName,
+  ImportError,
+  parseRoutineImport,
+} from '../../services/exportImport';
 import WorkoutSessionView from '../workout/WorkoutSessionView';
 import RoutineDetail from './RoutineDetail';
 import RoutineEditor from './RoutineEditor';
@@ -21,6 +26,7 @@ function RoutinesHome() {
   const [resumable, setResumable] = useState<WorkoutSession | null>(null);
 
   const [savedName, setSavedName] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const savedTimer = useRef<number | null>(null);
   useEffect(
     () => () => {
@@ -59,6 +65,24 @@ function RoutinesHome() {
     const updated = await storage.listRoutines();
     setRoutines(updated);
     setMode({ kind: 'list' });
+  }
+
+  // §4.5: import a routine-export.json, validate it, de-conflict the name
+  // ("import as copy"), persist, and surface it in the list.
+  async function handleImportFile(file: File): Promise<void> {
+    const text = await file.text();
+    const routine = parseRoutineImport(text);
+    const existing = await storage.listRoutines();
+    const resolved = deconflictRoutineName(
+      routine,
+      existing.map((r) => r.name),
+    );
+    await storage.upsertRoutine(resolved);
+    const updated = await storage.listRoutines();
+    setRoutines(updated);
+    setSavedName(resolved.name);
+    if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setSavedName(null), 2500);
   }
 
   async function handleDelete(id: string) {
@@ -143,10 +167,42 @@ function RoutinesHome() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Routines</h1>
-        <Button variant="primary" onClick={() => openEditor(null)}>
-          New routine
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => importInputRef.current?.click()}
+          >
+            Import
+          </Button>
+          <Button variant="primary" onClick={() => openEditor(null)}>
+            New routine
+          </Button>
+        </div>
       </div>
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        aria-label="Import routine"
+        className="pointer-events-none absolute h-px w-px opacity-0"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file == null) return;
+          void (async () => {
+            try {
+              await handleImportFile(file);
+            } catch (error) {
+              window.alert(
+                error instanceof ImportError
+                  ? error.message
+                  : 'Could not import that file.',
+              );
+            }
+          })();
+        }}
+      />
 
       {savedName && (
         <p

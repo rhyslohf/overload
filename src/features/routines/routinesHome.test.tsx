@@ -5,14 +5,31 @@ import { StorageProvider } from '../../components/StorageProvider';
 import type { StorageService } from '../../services/storage';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
 import { exportRoutine } from '../../services/exportImport';
+import type {
+  parseRoutineImport,
+  deconflictRoutineName,
+  ImportError,
+} from '../../services/exportImport';
 import type { Routine, WorkoutSession } from '../../types/models';
-import { createRoutine, createWorkoutSession } from '../../types/factories';
+import {
+  createRoutine,
+  createRoutineExercise,
+  createWorkoutSession,
+} from '../../types/factories';
 import RoutinesHome from './RoutinesHome';
 import { memoryStorage } from '../../test/memoryStorage';
 
-vi.mock('../../services/exportImport', () => ({
-  exportRoutine: vi.fn(),
-}));
+vi.mock('../../services/exportImport', async () => {
+  const actual = await vi.importActual<{
+    parseRoutineImport: typeof parseRoutineImport;
+    deconflictRoutineName: typeof deconflictRoutineName;
+    ImportError: typeof ImportError;
+  }>('../../services/exportImport');
+  return {
+    ...actual,
+    exportRoutine: vi.fn(),
+  };
+});
 
 function renderRoutines(): StorageService {
   const storage: StorageService = createLocalStorageAdapter(memoryStorage());
@@ -800,5 +817,70 @@ describe('RoutineDetail — export', () => {
     await user.click(await screen.findByRole('button', { name: 'Export' }));
 
     expect(exportRoutine).toHaveBeenCalledWith(routine);
+  });
+});
+
+describe('RoutinesHome — import routine', () => {
+  it('imports a routine-export.json file into the list', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    const imported: Routine = {
+      ...createRoutine({ name: 'Pull Day' }),
+      exercises: [createRoutineExercise({ name: 'Row', order: 0, sets: [] })],
+    };
+    const file = new File(
+      [
+        JSON.stringify({
+          schemaVersion: 1,
+          exportedAt: new Date().toISOString(),
+          routine: imported,
+        }),
+      ],
+      'routine-export.json',
+      { type: 'application/json' },
+    );
+
+    await user.upload(screen.getByLabelText(/import routine/i), file);
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      expect(routines).toHaveLength(1);
+      expect(routines[0].name).toBe('Pull Day');
+    });
+
+    expect(
+      await screen.findByRole('button', { name: /Pull Day/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('renames an imported routine on a name collision', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+    await seedRoutine(storage, 'Push Day', 'Bench Press');
+
+    const imported: Routine = {
+      ...createRoutine({ name: 'Push Day' }),
+      exercises: [],
+    };
+    const file = new File(
+      [
+        JSON.stringify({
+          schemaVersion: 1,
+          exportedAt: new Date().toISOString(),
+          routine: imported,
+        }),
+      ],
+      'routine-export.json',
+      { type: 'application/json' },
+    );
+
+    await user.upload(screen.getByLabelText(/import routine/i), file);
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      expect(routines).toHaveLength(2);
+      expect(routines.some((r) => r.name === 'Push Day (copy)')).toBe(true);
+    });
   });
 });

@@ -411,6 +411,39 @@ describe('WorkoutSessionView — start a workout', () => {
     ).toBeInTheDocument();
   });
 
+  it('auto-starts the rest timer when a set is logged', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /Rest timer, 0:00, idle/ }),
+    ).toBeInTheDocument();
+
+    const exercise = await firstExercise();
+    const reps = (await within(exercise).findAllByLabelText(/Reps/))[0];
+    await user.clear(reps);
+    await user.type(reps, '10');
+    await user.click(
+      within(exercise).getAllByRole('button', { name: /Difficulty 3/ })[0],
+    );
+    await user.click(
+      within(exercise).getAllByRole('button', { name: 'Log set' })[0],
+    );
+
+    expect(
+      await screen.findByRole('button', {
+        name: /Rest timer, \d+:\d+, running/,
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('finishes the session as completed with a timestamp', async () => {
     const user = userEvent.setup();
     const storage = createLocalStorageAdapter(memoryStorage());

@@ -10,6 +10,7 @@ import type {
   WorkoutSession,
 } from '../../types/models';
 import { createLoggedSet, createSetDefinition } from '../../types/factories';
+import RestTimer from './RestTimer';
 import SetLogRow from './SetLogRow';
 
 interface WorkoutSessionViewProps {
@@ -44,6 +45,8 @@ function WorkoutSessionView({
   // Unplanned sets added during the session (§4.2). Keyed by session exercise
   // index; each entry is a synthetic SetDefinition the row can log against.
   const [extras, setExtras] = useState<Record<number, SetDefinition[]>>({});
+  // §4.3 (recommended): increment to auto-start a fresh rest per set log.
+  const [restSignal, setRestSignal] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,6 +130,7 @@ function WorkoutSessionView({
     };
     setSession(next);
     void storage.upsertSession(next);
+    setRestSignal((n) => n + 1);
   }
 
   function appendLoggedSet(
@@ -143,6 +147,7 @@ function WorkoutSessionView({
     };
     setSession(next);
     void storage.upsertSession(next);
+    setRestSignal((n) => n + 1);
   }
 
   // §4.2 "skip a planned one without breaking the session": record the setDefId
@@ -238,6 +243,11 @@ function WorkoutSessionView({
           })}
         </p>
       </div>
+
+      <RestTimer
+        autoStartSignal={restSignal}
+        targetRestSeconds={nextTargetRest(current.exercises, plan, skippedFor)}
+      />
 
       <ol className="flex flex-col gap-3">
         {current.exercises.map((exercise, exerciseIndex) => {
@@ -341,6 +351,28 @@ function findLoggedSet(
   set: SetDefinition,
 ): WorkoutSession['exercises'][number]['sets'][number] | undefined {
   return exercise.sets.find((s) => s.setDefId === set.id);
+}
+
+/**
+ * §4.3 (optional): the first planned set that still has a rest to take — its
+ * `targetRestSeconds` is the subtle reference. Only if it's not already done.
+ */
+function nextTargetRest(
+  exercises: WorkoutSession['exercises'],
+  plan: PlanExercise[],
+  skippedFor: (exercise: LoggedExercise, set: SetDefinition) => boolean,
+): number | undefined {
+  for (let i = 0; i < exercises.length; i += 1) {
+    const exercise = exercises[i];
+    const sets = plan[i]?.sets ?? [];
+    for (const set of sets) {
+      if (set.targetRestSeconds == null) continue;
+      if (findLoggedSet(exercise, set) != null) continue;
+      if (skippedFor(exercise, set)) continue;
+      return set.targetRestSeconds;
+    }
+  }
+  return undefined;
 }
 
 /** Live percentage recompute needs the *logged* weight of the source set. */

@@ -1,12 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
 import { StorageProvider } from '../../components/StorageProvider';
 import type { StorageService } from '../../services/storage';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
+import { exportRoutine } from '../../services/exportImport';
 import type { Routine, WorkoutSession } from '../../types/models';
 import { createRoutine, createWorkoutSession } from '../../types/factories';
 import RoutinesHome from './RoutinesHome';
 import { memoryStorage } from '../../test/memoryStorage';
+
+vi.mock('../../services/exportImport', () => ({
+  exportRoutine: vi.fn(),
+}));
 
 function renderRoutines(): StorageService {
   const storage: StorageService = createLocalStorageAdapter(memoryStorage());
@@ -775,5 +781,24 @@ describe('RoutinesHome — exercise-name autocomplete', () => {
 
     await screen.findByText('Seeded');
     expect(screen.queryByText(/Resume “Seeded”/)).not.toBeInTheDocument();
+  });
+});
+
+describe('RoutineDetail — export', () => {
+  it('exports the routine to a JSON download', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await seedRoutine(storage, 'Push Day', 'Bench Press');
+    const routine = (await storage.listRoutines())[0];
+    render(
+      <StorageProvider storage={storage}>
+        <RoutinesHome />
+      </StorageProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(await screen.findByRole('button', { name: 'Export' }));
+
+    expect(exportRoutine).toHaveBeenCalledWith(routine);
   });
 });

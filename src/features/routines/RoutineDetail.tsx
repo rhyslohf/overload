@@ -1,5 +1,6 @@
 import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
+import { exportRoutine } from '../../services/exportImport';
 import type { Routine } from '../../types/models';
 import { formatSetDefinition } from '../../utils/formatSet';
 import { useEffect, useState } from 'react';
@@ -73,6 +74,14 @@ function RoutineDetail({
 
       <Button className="w-full" onClick={() => onStart(routine)}>
         Start workout
+      </Button>
+
+      <Button
+        variant="secondary"
+        className="w-full"
+        onClick={() => exportRoutine(routine)}
+      >
+        Export
       </Button>
 
       <div className="flex gap-2">

@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
 import { StorageProvider } from '../../components/StorageProvider';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
 import type { StorageService } from '../../services/storage';
+import { exportHistory } from '../../services/exportImport';
 import { memoryStorage } from '../../test/memoryStorage';
 import type { Routine, WorkoutSession } from '../../types/models';
 import {
@@ -12,6 +14,10 @@ import {
   createWorkoutSession,
 } from '../../types/factories';
 import HistoryHome from './HistoryHome';
+
+vi.mock('../../services/exportImport', () => ({
+  exportHistory: vi.fn(),
+}));
 
 /** Build a finished session: one routine, one exercise, one logged set. */
 async function buildFinishedSession(overrides?: {
@@ -283,5 +289,34 @@ describe('HistoryHome — detail', () => {
     await user.click(await screen.findByRole('button', { name: /Push Day/ }));
 
     expect(screen.getByText('1 skipped')).toBeInTheDocument();
+  });
+
+  it('exports all history when "Export all" is tapped', async () => {
+    const user = userEvent.setup();
+    const { storage, session } = await buildFinishedSession();
+    render(
+      <StorageProvider storage={storage}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Export all' }));
+
+    expect(exportHistory).toHaveBeenCalledWith([session]);
+  });
+
+  it('hides "Export all" when there are no finished sessions', async () => {
+    render(
+      <StorageProvider storage={createLocalStorageAdapter(memoryStorage())}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    await screen.findByText(
+      "No logged sessions yet. Finish a workout and it'll land here.",
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Export all' }),
+    ).not.toBeInTheDocument();
   });
 });

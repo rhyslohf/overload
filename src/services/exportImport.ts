@@ -1,4 +1,4 @@
-import type { Routine } from '../types/models';
+import type { Routine, WorkoutSession } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
 
 /** Thrown when an uploaded file can't be parsed as a valid routine export. */
@@ -13,6 +13,29 @@ export interface RoutineExport {
   schemaVersion: number;
   exportedAt: string;
   routine: Routine;
+}
+
+/**
+ * History export payload (REQUIREMENTS.md §6 `history-export.json`).
+ * Every finished session in one file for backup / portability.
+ */
+export interface HistoryExport {
+  schemaVersion: number;
+  exportedAt: string;
+  sessions: WorkoutSession[];
+}
+
+/** Trigger a browser download of `json` as `filename`. */
+function downloadJson(filename: string, json: string): void {
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }
 
 /** Build the routine-export.json payload. */
@@ -31,16 +54,27 @@ export function serializeRoutineExport(routine: Routine): RoutineExport {
  */
 export function exportRoutine(routine: Routine): void {
   const payload = serializeRoutineExport(routine);
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${routine.name}-routine.json`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  downloadJson(
+    `${routine.name}-routine.json`,
+    JSON.stringify(payload, null, 2),
+  );
+}
+
+/** Build the history-export.json payload (all sessions). */
+export function serializeHistoryExport(
+  sessions: WorkoutSession[],
+): HistoryExport {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    sessions,
+  };
+}
+
+/** Serialize every session to history-export.json and download it. */
+export function exportHistory(sessions: WorkoutSession[]): void {
+  const payload = serializeHistoryExport(sessions);
+  downloadJson('history-export.json', JSON.stringify(payload, null, 2));
 }
 
 /** True when `value` is a non-empty string. */

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
 import type { WorkoutSession } from '../../types/models';
+import { exportHistory } from '../../services/exportImport';
 import SessionDetail from './SessionDetail';
 
 type Mode = { kind: 'list' } | { kind: 'detail'; sessionId: string };
@@ -51,7 +53,14 @@ function HistoryHome() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">History</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">History</h1>
+        {sessions.length > 0 && (
+          <Button variant="secondary" onClick={() => exportHistory(sessions)}>
+            Export all
+          </Button>
+        )}
+      </div>
 
       {!loaded ? (
         <p className="text-sm text-ink-2">Loading…</p>

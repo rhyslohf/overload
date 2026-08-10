@@ -5,10 +5,12 @@ import {
   parseRoutineImport,
   deconflictRoutineName,
   ImportError,
+  serializeHistoryExport,
+  exportHistory,
 } from './exportImport';
 import type { Routine } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
-import { createRoutine } from '../types/factories';
+import { createRoutine, createWorkoutSession } from '../types/factories';
 
 function routineExportJson(routine: Routine): string {
   return JSON.stringify({
@@ -32,6 +34,10 @@ describe('serializeRoutineExport', () => {
 });
 
 describe('exportRoutine', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('serializes the routine and triggers a download via an anchor click', () => {
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
@@ -46,6 +52,41 @@ describe('exportRoutine', () => {
 
     const anchor = clickSpy.mock.instances[0] as HTMLAnchorElement;
     expect(anchor.download).toBe('Push Day-routine.json');
+    expect(anchor.href).toBe('blob:mock');
+  });
+});
+
+describe('serializeHistoryExport', () => {
+  it('wraps all sessions in the history-export.json shape', () => {
+    const sessions = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    const payload = serializeHistoryExport(sessions);
+
+    expect(payload.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(typeof payload.exportedAt).toBe('string');
+    expect(Number.isNaN(Date.parse(payload.exportedAt))).toBe(false);
+    expect(payload.sessions).toBe(sessions);
+  });
+});
+
+describe('exportHistory', () => {
+  it('serializes the sessions and triggers a download', () => {
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const sessions = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    exportHistory(sessions);
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    const anchor = clickSpy.mock.instances[0] as HTMLAnchorElement;
+    expect(anchor.download).toBe('history-export.json');
     expect(anchor.href).toBe('blob:mock');
   });
 });

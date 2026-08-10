@@ -410,4 +410,54 @@ describe('WorkoutSessionView — start a workout', () => {
       screen.getByRole('button', { name: /Push Day/ }),
     ).toBeInTheDocument();
   });
+
+  it('finishes the session as completed with a timestamp', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Finish workout' }),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /Push Day/ }),
+    ).toBeInTheDocument();
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].status).toBe('completed');
+      expect(sessions[0].completedAt).toBeTruthy();
+    });
+  });
+
+  it('abandons the session and keeps it out of the resume list', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Abandon session' }),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /Push Day/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Resume/)).not.toBeInTheDocument();
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      expect(sessions[0].status).toBe('abandoned');
+      expect(sessions[0].completedAt).toBeTruthy();
+    });
+  });
 });

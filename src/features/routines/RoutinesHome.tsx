@@ -74,6 +74,28 @@ function RoutinesHome() {
     setMode({ kind: 'workout', sessionId: session.id });
   }
 
+  // §4.2 "mark session complete (timestamps + locks it into history)".
+  async function handleFinish(session: WorkoutSession) {
+    await storage.upsertSession({
+      ...session,
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+    });
+    setResumable(null);
+    setMode({ kind: 'list' });
+  }
+
+  // §4.2 "…or abandon it" — kept out of the resume banner but retained in history.
+  async function handleAbandon(session: WorkoutSession) {
+    await storage.upsertSession({
+      ...session,
+      status: 'abandoned',
+      completedAt: new Date().toISOString(),
+    });
+    setResumable(null);
+    setMode({ kind: 'list' });
+  }
+
   if (mode.kind === 'editor') {
     return (
       <RoutineEditor
@@ -107,7 +129,12 @@ function RoutinesHome() {
       <WorkoutSessionView
         sessionId={mode.sessionId}
         onBack={() => setMode({ kind: 'list' })}
-        onFinish={() => setMode({ kind: 'list' })}
+        onFinish={(session) => {
+          void handleFinish(session);
+        }}
+        onAbandon={(session) => {
+          void handleAbandon(session);
+        }}
       />
     );
   }

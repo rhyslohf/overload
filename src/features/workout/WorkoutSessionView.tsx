@@ -16,6 +16,7 @@ interface WorkoutSessionViewProps {
   sessionId: string;
   onBack: () => void;
   onFinish: (session: WorkoutSession) => void;
+  onAbandon: (session: WorkoutSession) => void;
 }
 
 interface PlanExercise {
@@ -34,6 +35,7 @@ function WorkoutSessionView({
   sessionId,
   onBack,
   onFinish,
+  onAbandon,
 }: WorkoutSessionViewProps) {
   const storage = useStorage();
   const [session, setSession] = useState<WorkoutSession | null>(null);
@@ -314,9 +316,18 @@ function WorkoutSessionView({
         })}
       </ol>
 
-      <Button className="w-full" onClick={() => onFinish(session)}>
-        Finish workout
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="danger"
+          className="flex-1"
+          onClick={() => onAbandon(session)}
+        >
+          Abandon session
+        </Button>
+        <Button className="flex-1" onClick={() => onFinish(session)}>
+          Finish workout
+        </Button>
+      </div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ interface SetLogRowProps {
     difficulty: Difficulty;
   }) => void;
   onAddMiniSet: (reps: number) => void;
+  onSkip?: () => void;
 }
 
 function parseNumber(raw: string): number | undefined {
@@ -48,6 +49,7 @@ function SetLogRow({
   logged,
   onLog,
   onAddMiniSet,
+  onSkip,
 }: SetLogRowProps) {
   const percentage = set.weightMode === 'percentageOfSet';
   const computed = percentage ? computedWeight() : undefined;
@@ -212,6 +214,15 @@ function SetLogRow({
       >
         Log set
       </Button>
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="self-center text-sm text-ink-3 transition-colors duration-100 hover:text-ink"
+        >
+          Skip this set
+        </button>
+      )}
     </div>
   );
 }

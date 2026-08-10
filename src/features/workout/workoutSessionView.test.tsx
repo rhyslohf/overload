@@ -301,6 +301,99 @@ describe('WorkoutSessionView — start a workout', () => {
     ).toBeInTheDocument();
   });
 
+  it('adds an unplanned set without a set definition', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    await user.click(
+      within(exercise).getByRole('button', { name: '+ Add set' }),
+    );
+
+    const weightLabel =
+      await within(exercise).findByLabelText('Extra Weight (kg)');
+    const extraRow = weightLabel.closest('li')!;
+    const weight = weightLabel;
+    const reps = within(extraRow).getByLabelText('Extra Reps');
+    await user.clear(weight);
+    await user.type(weight, '55');
+    await user.clear(reps);
+    await user.type(reps, '12');
+    await user.click(
+      within(extraRow).getByRole('button', { name: /Difficulty 2/ }),
+    );
+    await user.click(within(extraRow).getByRole('button', { name: 'Log set' }));
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      const exercise0 = sessions[0].exercises[0];
+      expect(exercise0.sets).toHaveLength(1);
+      const logged = exercise0.sets[0];
+      expect(logged).toMatchObject({ weightKg: 55, reps: 12, difficulty: 2 });
+      const plannedIds = (
+        await storage.listRoutines()
+      )[0].exercises[0].sets.map((s) => s.id);
+      expect(plannedIds).not.toContain(logged.setDefId);
+    });
+  });
+
+  it('adds an unplanned set even with no planned sets', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    await user.click(
+      within(exercise).getByRole('button', { name: '+ Add set' }),
+    );
+    expect(
+      await within(exercise).findByLabelText('Extra Weight (kg)'),
+    ).toBeInTheDocument();
+  });
+
+  it('skips a planned set and collapses its row', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    await user.click(
+      within(exercise).getAllByRole('button', {
+        name: 'Skip this set',
+      })[0],
+    );
+
+    expect(await within(exercise).findByText('Skipped')).toBeInTheDocument();
+    const skipped = within(exercise).getByText('Skipped');
+    expect(within(skipped.closest('li')!).queryByText('Log set')).toBeNull();
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      const exercise0 = sessions[0].exercises[0];
+      const planned = (await storage.listRoutines())[0].exercises[0].sets;
+      expect(exercise0.skippedSetDefIds).toEqual([planned[0].id]);
+    });
+  });
+
   it('returns to the routine list via Back', async () => {
     const user = userEvent.setup();
     const storage = createLocalStorageAdapter(memoryStorage());

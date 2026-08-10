@@ -9,7 +9,7 @@ import type {
   SetDefinition,
   WorkoutSession,
 } from '../../types/models';
-import { createLoggedSet } from '../../types/factories';
+import { createLoggedSet, createSetDefinition } from '../../types/factories';
 import SetLogRow from './SetLogRow';
 
 interface WorkoutSessionViewProps {
@@ -39,6 +39,9 @@ function WorkoutSessionView({
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [plan, setPlan] = useState<PlanExercise[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Unplanned sets added during the session (§4.2). Keyed by session exercise
+  // index; each entry is a synthetic SetDefinition the row can log against.
+  const [extras, setExtras] = useState<Record<number, SetDefinition[]>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -140,10 +143,74 @@ function WorkoutSessionView({
     void storage.upsertSession(next);
   }
 
+  // §4.2 "skip a planned one without breaking the session": record the setDefId
+  // so the row collapses to a Skipped marker and autosaves with the session.
+  function handleSkip(exerciseIndex: number, setDef: SetDefinition) {
+    const next: WorkoutSession = {
+      ...current,
+      exercises: current.exercises.map((exercise, i) =>
+        i === exerciseIndex
+          ? {
+              ...exercise,
+              skippedSetDefIds: [
+                ...(exercise.skippedSetDefIds ?? []),
+                setDef.id,
+              ],
+            }
+          : exercise,
+      ),
+    };
+    setSession(next);
+    void storage.upsertSession(next);
+  }
+
+  // §4.2 "add an unplanned extra set": append a blank row to that exercise only.
+  function handleAddSet(exerciseIndex: number) {
+    const planned = plannedSetsFor(exerciseIndex).length;
+    const existing = extras[exerciseIndex]?.length ?? 0;
+    setExtras({
+      ...extras,
+      [exerciseIndex]: [
+        ...(extras[exerciseIndex] ?? []),
+        createSetDefinition(planned + existing),
+      ],
+    });
+  }
+
+  // An unplanned set logs like a planned one; its synthetic id is its setDefId
+  // and extra orders continue after the planned sets.
+  function handleLogExtra(
+    exerciseIndex: number,
+    extra: SetDefinition,
+    input: { weightKg: number; reps: number; difficulty: Difficulty },
+  ) {
+    appendLoggedSet(
+      exerciseIndex,
+      createLoggedSet({
+        setDefId: extra.id,
+        order: extra.order,
+        weightKg: input.weightKg,
+        reps: input.reps,
+        difficulty: input.difficulty,
+      }),
+    );
+    setExtras({
+      ...extras,
+      [exerciseIndex]: extras[exerciseIndex]?.filter((e) => e.id !== extra.id),
+    });
+  }
+
+  function plannedSetsFor(exerciseIndex: number): SetDefinition[] {
+    return plan[exerciseIndex]?.sets ?? [];
+  }
+
   const plannedSets: Map<number, SetDefinition[]> = new Map();
   current.exercises.forEach((_, exerciseIndex) => {
     plannedSets.set(exerciseIndex, plan[exerciseIndex]?.sets ?? []);
   });
+
+  const skippedFor = (exercise: LoggedExercise, set: SetDefinition) =>
+    (exercise.skippedSetDefIds ?? []).includes(set.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -173,6 +240,7 @@ function WorkoutSessionView({
       <ol className="flex flex-col gap-3">
         {current.exercises.map((exercise, exerciseIndex) => {
           const sets = plannedSets.get(exerciseIndex) ?? [];
+          const exerciseExtras = extras[exerciseIndex] ?? [];
           return (
             <li
               key={exercise.id}
@@ -188,26 +256,59 @@ function WorkoutSessionView({
                       <p className="pb-1 text-xs font-semibold text-ink-3">
                         Set {setIndex + 1}
                       </p>
+                      {skippedFor(exercise, set) ? (
+                        <div className="rounded-lg border border-line/70 bg-raise p-3">
+                          <p className="text-sm font-medium text-ink-2">
+                            Skipped
+                          </p>
+                        </div>
+                      ) : (
+                        <SetLogRow
+                          set={set}
+                          labelPrefix={`Set ${setIndex + 1}`}
+                          sourceLoggedWeight={sourceWeightFor(exercise, set)}
+                          logged={findLoggedSet(exercise, set)}
+                          onLog={(input) =>
+                            handleLog(exerciseIndex, set, input)
+                          }
+                          onAddMiniSet={(miniReps) =>
+                            handleAddMiniSet(exerciseIndex, set, miniReps)
+                          }
+                          onSkip={() => handleSkip(exerciseIndex, set)}
+                        />
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {exerciseExtras.length > 0 && (
+                <ol className="mt-2 flex flex-col gap-2">
+                  {exerciseExtras.map((extra) => (
+                    <li
+                      key={extra.id}
+                      className="rounded-lg border border-dashed border-line bg-panel p-2"
+                    >
                       <SetLogRow
-                        set={set}
-                        labelPrefix={`Set ${setIndex + 1}`}
-                        sourceLoggedWeight={sourceWeightFor(
-                          current.exercises[exerciseIndex],
-                          set,
-                        )}
-                        logged={findLoggedSet(
-                          current.exercises[exerciseIndex],
-                          set,
-                        )}
-                        onLog={(input) => handleLog(exerciseIndex, set, input)}
-                        onAddMiniSet={(miniReps) =>
-                          handleAddMiniSet(exerciseIndex, set, miniReps)
+                        set={extra}
+                        labelPrefix="Extra"
+                        sourceLoggedWeight={undefined}
+                        logged={findLoggedSet(exercise, extra)}
+                        onLog={(input) =>
+                          handleLogExtra(exerciseIndex, extra, input)
                         }
+                        onAddMiniSet={() => {}}
                       />
                     </li>
                   ))}
                 </ol>
               )}
+              <button
+                type="button"
+                onClick={() => handleAddSet(exerciseIndex)}
+                className="mt-3 self-start rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink-2 transition-colors duration-100 hover:bg-raise"
+              >
+                + Add set
+              </button>
             </li>
           );
         })}

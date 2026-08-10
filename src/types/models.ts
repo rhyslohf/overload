@@ -66,6 +66,8 @@ export interface LoggedExercise {
   name: string;
   order: number;
   sets: LoggedSet[];
+  // §4.2 "skip a planned one": setDefIds deliberately not performed this session.
+  skippedSetDefIds?: string[];
 }
 
 export interface LoggedSet {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Button from '../../components/Button';
 import TextField from '../../components/TextField';
 import type { Difficulty, LoggedSet, SetDefinition } from '../../types/models';
+import { formatLoggedSet } from '../../utils/formatSet';
 import { roundToIncrement } from '../../utils/weight';
 import TapSelector from './TapSelector';
 
@@ -24,13 +25,6 @@ function parseNumber(raw: string): number | undefined {
   if (trimmed === '') return undefined;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function loggedSummary(logged: LoggedSet): string {
-  const sets = logged.myorepMiniSets?.length
-    ? ` + ${logged.myorepMiniSets.length} mini-sets`
-    : '';
-  return `${logged.weightKg} kg × ${logged.reps} · difficulty ${logged.difficulty}${sets}`;
 }
 
 /**
@@ -96,7 +90,7 @@ function SetLogRow({
     return (
       <div className="rounded-lg border border-line/70 bg-raise p-3">
         <p className="text-sm font-medium tabular-nums text-ink">
-          Logged · {loggedSummary(logged)}
+          Logged · {formatLoggedSet(logged)}
         </p>
       </div>
     );

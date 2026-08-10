@@ -1,4 +1,4 @@
-import type { SetDefinition } from '../types/models';
+import type { LoggedSet, SetDefinition } from '../types/models';
 
 /**
  * One-line human summary of a set definition — used by the routine detail
@@ -30,4 +30,15 @@ export function formatSetDefinition(set: SetDefinition): string {
 function percentageSummary(set: SetDefinition): string {
   const percent = set.percentageOf?.percent;
   return percent != null ? `${percent}% of a prior set` : '—';
+}
+
+/**
+ * Read-only one-line summary of a logged set — used by the live workout log
+ * and the history detail view.
+ */
+export function formatLoggedSet(logged: LoggedSet): string {
+  const sets = logged.myorepMiniSets?.length
+    ? ` + ${logged.myorepMiniSets.length} mini-sets`
+    : '';
+  return `${logged.weightKg} kg × ${logged.reps} · difficulty ${logged.difficulty}${sets}`;
 }

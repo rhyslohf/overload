@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { StorageProvider } from '../../components/StorageProvider';
 import type { StorageService } from '../../services/storage';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
-import type { Routine } from '../../types/models';
-import { createRoutine } from '../../types/factories';
+import type { Routine, WorkoutSession } from '../../types/models';
+import { createRoutine, createWorkoutSession } from '../../types/factories';
 import RoutinesHome from './RoutinesHome';
 import { memoryStorage } from '../../test/memoryStorage';
 
@@ -714,5 +714,66 @@ describe('RoutinesHome — exercise-name autocomplete', () => {
     await user.click(option);
 
     expect(screen.getByLabelText(/Exercise 1/)).toHaveValue('Overhead Press');
+  });
+
+  it('shows a resume banner when an in-progress session exists', async () => {
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await seedRoutine(storage, 'Seeded', 'Bench Press');
+    const routine = (await storage.listRoutines())[0];
+    const session: WorkoutSession = {
+      ...createWorkoutSession(routine),
+      startedAt: new Date('2026-08-10T09:00:00').toISOString(),
+    };
+    await storage.upsertSession(session);
+    render(
+      <StorageProvider storage={storage}>
+        <RoutinesHome />
+      </StorageProvider>,
+    );
+
+    expect(await screen.findByText(/Resume “Seeded”/)).toBeInTheDocument();
+  });
+
+  it('resumes the in-progress session into the workout view', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await seedRoutine(storage, 'Seeded', 'Bench Press');
+    const routine = (await storage.listRoutines())[0];
+    await storage.upsertSession(createWorkoutSession(routine));
+    render(
+      <StorageProvider storage={storage}>
+        <RoutinesHome />
+      </StorageProvider>,
+    );
+
+    const resume = await screen.findByRole('button', {
+      name: /Resume “Seeded”/,
+    });
+    await user.click(resume);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Seeded' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+  });
+
+  it('shows no resume banner once the in-progress session is completed', async () => {
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await seedRoutine(storage, 'Seeded', 'Bench Press');
+    const routine = (await storage.listRoutines())[0];
+    const session = {
+      ...createWorkoutSession(routine),
+      status: 'completed' as const,
+      completedAt: new Date().toISOString(),
+    };
+    await storage.upsertSession(session);
+    render(
+      <StorageProvider storage={storage}>
+        <RoutinesHome />
+      </StorageProvider>,
+    );
+
+    await screen.findByText('Seeded');
+    expect(screen.queryByText(/Resume “Seeded”/)).not.toBeInTheDocument();
   });
 });

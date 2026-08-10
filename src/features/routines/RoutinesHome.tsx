@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
-import type { Routine } from '../../types/models';
+import type { Routine, WorkoutSession } from '../../types/models';
 import { createWorkoutSession } from '../../types/factories';
 import WorkoutSessionView from '../workout/WorkoutSessionView';
 import RoutineDetail from './RoutineDetail';
@@ -18,6 +18,7 @@ function RoutinesHome() {
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [resumable, setResumable] = useState<WorkoutSession | null>(null);
 
   const [savedName, setSavedName] = useState<string | null>(null);
   const savedTimer = useRef<number | null>(null);
@@ -30,11 +31,17 @@ function RoutinesHome() {
 
   useEffect(() => {
     let cancelled = false;
-    void storage.listRoutines().then((result) => {
-      if (cancelled) return;
-      setRoutines(result);
-      setLoaded(true);
-    });
+    void Promise.all([storage.listRoutines(), storage.listSessions()]).then(
+      ([routinesResult, sessionsResult]) => {
+        if (cancelled) return;
+        setRoutines(routinesResult);
+        // §4.2 resume: exactly one in-progress session at a time is assumed.
+        setResumable(
+          sessionsResult.find((s) => s.status === 'inProgress') ?? null,
+        );
+        setLoaded(true);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -121,6 +128,30 @@ function RoutinesHome() {
         >
           Routine “{savedName}” saved.
         </p>
+      )}
+
+      {resumable && (
+        <button
+          type="button"
+          onClick={() => setMode({ kind: 'workout', sessionId: resumable.id })}
+          className="flex w-full items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-left transition-colors duration-100 hover:bg-accent/15 focus:outline-none focus:ring-2 focus:ring-accent"
+        >
+          <span>
+            <span className="block font-semibold text-accent-hi">
+              Resume “{resumable.routineName}”
+            </span>
+            <span className="text-sm text-ink-2">
+              In-progress workout from{' '}
+              {new Date(resumable.startedAt).toLocaleString(undefined, {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })}
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-accent-hi">
+            →
+          </span>
+        </button>
       )}
 
       {!loaded ? (

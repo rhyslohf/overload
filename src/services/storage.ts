@@ -22,6 +22,7 @@ export interface StorageService {
   listSessions(): Promise<WorkoutSession[]>;
   getSession(id: string): Promise<WorkoutSession | null>;
   upsertSession(session: WorkoutSession): Promise<void>;
+  deleteSession(id: string): Promise<void>;
 
   /* Exercise library (§4.1) — distinct exercises seen across routines */
   getExerciseLibrary(): Promise<ExerciseEntry[]>;

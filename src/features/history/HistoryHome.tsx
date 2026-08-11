@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button';
 import { useStorage } from '../../components/StorageProvider';
 import type { WorkoutSession } from '../../types/models';
-import { exportHistory } from '../../services/exportImport';
+import {
+  exportHistory,
+  importHistory,
+  ImportError,
+  parseHistoryImport,
+  type HistoryImportMode,
+} from '../../services/exportImport';
 import SessionDetail from './SessionDetail';
 
 type Mode = { kind: 'list' } | { kind: 'detail'; sessionId: string };
@@ -26,9 +32,14 @@ function sortSessions(sessions: WorkoutSession[]): WorkoutSession[] {
 
 function HistoryHome() {
   const storage = useStorage();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Sessions parsed from a picked file, awaiting a merge/replace choice.
+  const [pendingImport, setPendingImport] = useState<WorkoutSession[] | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +52,43 @@ function HistoryHome() {
       cancelled = true;
     };
   }, [storage]);
+
+  async function applyImport(
+    incoming: WorkoutSession[],
+    importMode: HistoryImportMode,
+  ) {
+    const existing = await storage.listSessions();
+    const next = importHistory(existing, incoming, importMode);
+    const nextIds = new Set(next.map((s) => s.id));
+    // Replace drops sessions that aren't in the incoming set.
+    for (const session of existing) {
+      if (!nextIds.has(session.id)) await storage.deleteSession(session.id);
+    }
+    for (const session of next) {
+      await storage.upsertSession(session);
+    }
+    setSessions(sortSessions(next));
+    setPendingImport(null);
+  }
+
+  function onImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file == null) return;
+    void (async () => {
+      try {
+        const text = await file.text();
+        setPendingImport(parseHistoryImport(text));
+      } catch (error) {
+        setPendingImport(null);
+        window.alert(
+          error instanceof ImportError
+            ? error.message
+            : 'Could not import that file.',
+        );
+      }
+    })();
+  }
 
   if (mode.kind === 'detail') {
     return (
@@ -55,12 +103,61 @@ function HistoryHome() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">History</h1>
-        {sessions.length > 0 && (
-          <Button variant="secondary" onClick={() => exportHistory(sessions)}>
-            Export all
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => importInputRef.current?.click()}
+          >
+            Import
           </Button>
-        )}
+          {sessions.length > 0 && (
+            <Button variant="secondary" onClick={() => exportHistory(sessions)}>
+              Export all
+            </Button>
+          )}
+        </div>
       </div>
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        aria-label="Import history"
+        className="pointer-events-none absolute h-px w-px opacity-0"
+        onChange={onImportFile}
+      />
+
+      {pendingImport && (
+        <div className="flex flex-col gap-2 rounded-lg border border-line bg-panel p-3">
+          <p className="text-sm text-ink-2">
+            Import {pendingImport.length}{' '}
+            {pendingImport.length === 1 ? 'session' : 'sessions'}?
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => void applyImport(pendingImport, 'merge')}
+            >
+              Merge
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => void applyImport(pendingImport, 'replace')}
+            >
+              Replace
+            </Button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPendingImport(null)}
+            className="self-center text-sm text-ink-3 transition-colors duration-100 hover:text-ink"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {!loaded ? (
         <p className="text-sm text-ink-2">Loading…</p>

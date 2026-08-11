@@ -77,6 +77,78 @@ export function exportHistory(sessions: WorkoutSession[]): void {
   downloadJson('history-export.json', JSON.stringify(payload, null, 2));
 }
 
+/** How an imported history combines with what's already stored. */
+export type HistoryImportMode = 'merge' | 'replace';
+
+/**
+ * Validate and parse a history-export.json payload (REQUIREMENTS.md §4.5,
+ * `history-export.json`). Accepts either the wrapped shape or a bare
+ * `WorkoutSession[]`. Returns the sessions. Throws `ImportError` on anything
+ * that isn't a recognizable history export. Structural so an older-schema
+ * export still imports — the migration stub (Phase 5 item 6) handles drift.
+ */
+export function parseHistoryImport(json: string): WorkoutSession[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new ImportError('File is not valid JSON.');
+  }
+
+  const rawSessions = Array.isArray(parsed)
+    ? parsed
+    : parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as { sessions?: unknown }).sessions)
+      ? (parsed as { sessions: unknown[] }).sessions
+      : null;
+
+  if (rawSessions == null) {
+    throw new ImportError('File is not a workout-history export.');
+  }
+
+  for (const session of rawSessions) {
+    if (session == null || typeof session !== 'object') {
+      throw new ImportError('History has a malformed session.');
+    }
+    const s = session as Record<string, unknown>;
+    if (!isNonEmptyString(s.routineName)) {
+      throw new ImportError('A session is missing its routine name.');
+    }
+    if (!isNonEmptyString(s.startedAt)) {
+      throw new ImportError('A session is missing its start time.');
+    }
+    if (!Array.isArray(s.exercises)) {
+      throw new ImportError('A session is missing its exercises.');
+    }
+  }
+
+  return rawSessions as WorkoutSession[];
+}
+
+/**
+ * Combine existing sessions with an imported set (§4.5). In `merge` mode
+ * the two are unioned with the imported session winning on an id collision;
+ * in `replace` mode the imported set fully overwrites. Pure so it's
+ * unit-testable.
+ */
+export function importHistory(
+  existing: WorkoutSession[],
+  incoming: WorkoutSession[],
+  mode: HistoryImportMode,
+): WorkoutSession[] {
+  if (mode === 'replace') return incoming;
+
+  const byId = new Map<string, WorkoutSession>();
+  for (const session of existing) {
+    byId.set(session.id, session);
+  }
+  for (const session of incoming) {
+    byId.set(session.id, session);
+  }
+  return [...byId.values()];
+}
+
 /** True when `value` is a non-empty string. */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

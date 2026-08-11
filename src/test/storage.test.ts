@@ -104,6 +104,28 @@ describe('LocalStorageAdapter — sessions', () => {
     await expect(service.getSession('s-1')).resolves.toEqual(session);
     await expect(service.getSession('missing')).resolves.toBeNull();
   });
+
+  it('deletes a session by id', async () => {
+    const doomed: WorkoutSession = {
+      id: 's-1',
+      schemaVersion: 1,
+      routineId: 'r-1',
+      routineName: 'Push Day',
+      startedAt: '2026-08-09T00:00:00.000Z',
+      status: 'inProgress',
+      exercises: [],
+    };
+    const keep: WorkoutSession = {
+      ...doomed,
+      id: 's-keep',
+    };
+    await service.upsertSession(doomed);
+    await service.upsertSession(keep);
+    await service.deleteSession('s-1');
+
+    await expect(service.listSessions()).resolves.toEqual([keep]);
+    await expect(service.getSession('s-1')).resolves.toBeNull();
+  });
 });
 
 describe('LocalStorageAdapter — exercise library', () => {

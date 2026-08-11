@@ -1,10 +1,14 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { StorageProvider } from '../../components/StorageProvider';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
 import type { StorageService } from '../../services/storage';
 import { exportHistory } from '../../services/exportImport';
+import type {
+  parseHistoryImport,
+  importHistory,
+} from '../../services/exportImport';
 import { memoryStorage } from '../../test/memoryStorage';
 import type { Routine, WorkoutSession } from '../../types/models';
 import {
@@ -15,9 +19,16 @@ import {
 } from '../../types/factories';
 import HistoryHome from './HistoryHome';
 
-vi.mock('../../services/exportImport', () => ({
-  exportHistory: vi.fn(),
-}));
+vi.mock('../../services/exportImport', async () => {
+  const actual = await vi.importActual<{
+    parseHistoryImport: typeof parseHistoryImport;
+    importHistory: typeof importHistory;
+  }>('../../services/exportImport');
+  return {
+    ...actual,
+    exportHistory: vi.fn(),
+  };
+});
 
 /** Build a finished session: one routine, one exercise, one logged set. */
 async function buildFinishedSession(overrides?: {
@@ -318,5 +329,92 @@ describe('HistoryHome — detail', () => {
     expect(
       screen.queryByRole('button', { name: 'Export all' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('HistoryHome — import', () => {
+  function historyFile(sessions: WorkoutSession[]): File {
+    return new File(
+      [
+        JSON.stringify({
+          schemaVersion: 1,
+          exportedAt: new Date().toISOString(),
+          sessions,
+        }),
+      ],
+      'history-export.json',
+      { type: 'application/json' },
+    );
+  }
+
+  it('merges an imported session into the list', async () => {
+    const user = userEvent.setup();
+    const { storage } = await buildFinishedSession({ routineName: 'Push Day' });
+    render(
+      <StorageProvider storage={storage}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    const incoming = createWorkoutSession(createRoutine({ name: 'Leg Day' }));
+    await user.upload(
+      screen.getByLabelText(/import history/i),
+      historyFile([incoming]),
+    );
+
+    expect(await screen.findByText(/Import 1 session\?/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Merge' }));
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      expect(sessions.some((s) => s.routineName === 'Leg Day')).toBe(true);
+      expect(sessions.some((s) => s.routineName === 'Push Day')).toBe(true);
+    });
+  });
+
+  it('replaces the list with the imported sessions', async () => {
+    const user = userEvent.setup();
+    const { storage } = await buildFinishedSession({ routineName: 'Push Day' });
+    render(
+      <StorageProvider storage={storage}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    const incoming = createWorkoutSession(createRoutine({ name: 'Leg Day' }));
+    await user.upload(
+      screen.getByLabelText(/import history/i),
+      historyFile([incoming]),
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Replace' }));
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].routineName).toBe('Leg Day');
+    });
+  });
+
+  it('cancels an pending import', async () => {
+    const user = userEvent.setup();
+    const { storage } = await buildFinishedSession();
+    render(
+      <StorageProvider storage={storage}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    const incoming = createWorkoutSession(createRoutine({ name: 'Leg Day' }));
+    await user.upload(
+      screen.getByLabelText(/import history/i),
+      historyFile([incoming]),
+    );
+
+    await screen.findByText(/Import 1 session\?/);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByText(/Import 1 session\?/)).not.toBeInTheDocument();
   });
 });

@@ -88,6 +88,14 @@ export function createLocalStorageAdapter(
       writeCollection(storage, SESSIONS_KEY, next);
     },
 
+    async deleteSession(id) {
+      const sessions = readCollection<WorkoutSession>(
+        storage,
+        SESSIONS_KEY,
+      ).filter((session) => session.id !== id);
+      writeCollection(storage, SESSIONS_KEY, sessions);
+    },
+
     async getExerciseLibrary(): Promise<ExerciseEntry[]> {
       const routines = readCollection<Routine>(storage, ROUTINES_KEY);
       return buildExerciseLibrary(routines);

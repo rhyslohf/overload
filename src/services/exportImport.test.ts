@@ -7,8 +7,10 @@ import {
   ImportError,
   serializeHistoryExport,
   exportHistory,
+  parseHistoryImport,
+  importHistory,
 } from './exportImport';
-import type { Routine } from '../types/models';
+import type { Routine, WorkoutSession } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
 import { createRoutine, createWorkoutSession } from '../types/factories';
 
@@ -71,6 +73,10 @@ describe('serializeHistoryExport', () => {
 });
 
 describe('exportHistory', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('serializes the sessions and triggers a download', () => {
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
@@ -88,6 +94,77 @@ describe('exportHistory', () => {
     const anchor = clickSpy.mock.instances[0] as HTMLAnchorElement;
     expect(anchor.download).toBe('history-export.json');
     expect(anchor.href).toBe('blob:mock');
+  });
+});
+
+describe('parseHistoryImport', () => {
+  function historyExportJson(sessions: WorkoutSession[]): string {
+    return JSON.stringify({
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      sessions,
+    });
+  }
+
+  it('parses a wrapped history-export.json payload', () => {
+    const sessions = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    const parsed = parseHistoryImport(historyExportJson(sessions));
+
+    expect(parsed).toEqual(sessions);
+  });
+
+  it('accepts a bare sessions array', () => {
+    const sessions = [createWorkoutSession(createRoutine({ name: 'Leg Day' }))];
+    const parsed = parseHistoryImport(JSON.stringify(sessions));
+
+    expect(parsed).toEqual(sessions);
+  });
+
+  it('throws ImportError on invalid JSON', () => {
+    expect(() => parseHistoryImport('{ not json')).toThrow(ImportError);
+  });
+
+  it('throws ImportError when the payload is not a history export', () => {
+    expect(() => parseHistoryImport(JSON.stringify({ foo: 'bar' }))).toThrow(
+      ImportError,
+    );
+  });
+
+  it('throws ImportError when a session is missing its routine name', () => {
+    const session = createWorkoutSession(createRoutine({ name: 'Push Day' }));
+    delete (session as { routineName?: string }).routineName;
+
+    expect(() => parseHistoryImport(historyExportJson([session]))).toThrow(
+      /routine name/i,
+    );
+  });
+});
+
+describe('importHistory', () => {
+  it('replaces existing sessions with the incoming set', () => {
+    const existing = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    const incoming = [createWorkoutSession(createRoutine({ name: 'Leg Day' }))];
+    const result = importHistory(existing, incoming, 'replace');
+
+    expect(result).toEqual(incoming);
+  });
+
+  it('merges sessions and de-duplicates by id (incoming wins)', () => {
+    const shared = createWorkoutSession(createRoutine({ name: 'Push Day' }));
+    const existing = [shared];
+    const incoming = [{ ...shared, routineName: 'Renamed' }];
+    const other = createWorkoutSession(createRoutine({ name: 'Leg Day' }));
+    incoming.push(other);
+
+    const result = importHistory(existing, incoming, 'merge');
+
+    expect(result).toHaveLength(2);
+    expect(result.find((s) => s.id === shared.id)?.routineName).toBe('Renamed');
+    expect(result.find((s) => s.id === other.id)).toBe(other);
   });
 });
 

@@ -461,6 +461,29 @@ describe('RoutinesHome — myorep toggle & config', () => {
   });
 });
 
+describe('RoutinesHome — warm-up toggle', () => {
+  it('marks a set as warm-up and saves it', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Bench Press');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '40');
+    await user.click(screen.getByRole('switch', { name: /Set 1 warm up/i }));
+
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      expect(routines[0].exercises[0].sets[0].isWarmup).toBe(true);
+    });
+  });
+});
+
 describe('RoutinesHome — percentage-of-set', () => {
   async function newRoutineWithTwoSets(
     user: ReturnType<typeof userEvent.setup>,
@@ -605,6 +628,25 @@ describe('RoutinesHome — list & select saved routines', () => {
     await user.type(screen.getByLabelText(/Routine name/), name);
     await user.click(screen.getByRole('button', { name: 'Save routine' }));
   }
+
+  it('marks warm-up sets in the detail view', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Bench Press');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '10');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '40');
+    await user.click(screen.getByRole('switch', { name: /Set 1 warm up/i }));
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await user.click(screen.getByRole('button', { name: /Push Day/ }));
+
+    expect(screen.getByText(/Warm-up · 10 × 40 kg/)).toBeInTheDocument();
+  });
 
   it('lists saved routines with their exercise count', async () => {
     const user = userEvent.setup();

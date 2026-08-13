@@ -63,6 +63,10 @@ function SetList({ sets, onChange }: SetListProps) {
     });
   }
 
+  function handleWarmupToggle(index: number) {
+    handlePatch(index, { isWarmup: !sets[index].isWarmup });
+  }
+
   function handleMyorepToggle(index: number) {
     const set = sets[index];
     if (set.isMyorep) {
@@ -183,6 +187,13 @@ function SetList({ sets, onChange }: SetListProps) {
           </div>
 
           <div className="flex gap-2">
+            <Switch
+              className="flex-1"
+              checked={set.isWarmup === true}
+              label="Warm-up"
+              ariaLabel={`Set ${index + 1} warm up`}
+              onClick={() => handleWarmupToggle(index)}
+            />
             <Switch
               className="flex-1"
               checked={set.toFailure}

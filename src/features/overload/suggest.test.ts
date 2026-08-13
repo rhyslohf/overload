@@ -112,6 +112,18 @@ describe('suggestNext', () => {
     expect(suggestNext(set, prior({ reps: 8, difficulty: 2 }))).toBeUndefined();
   });
 
+  it('gives no suggestion for warm-up sets even with easy history', () => {
+    const set = createSetDefinition(0, {
+      isWarmup: true,
+      targetReps: 8,
+      targetWeightKg: 100,
+    });
+
+    expect(
+      suggestNext(set, prior({ reps: 10, difficulty: 1 })),
+    ).toBeUndefined();
+  });
+
   it('returns undefined with no prior log (routine default used)', () => {
     const set = createSetDefinition(0, { targetReps: 8, targetWeightKg: 100 });
     expect(suggestNext(set, undefined)).toBeUndefined();

@@ -67,6 +67,7 @@ export function findPriorLoggedSet(
 
 /**
  * v1 heuristic (§7). Returns undefined when no suggestion applies:
+ *   - warm-up sets get no suggestion at all (§11.3);
  *   - percentage-of-set sets get no independent suggestion (recomputed live);
  *   - no prior history → fall back to the routine's stored target (§4.6).
  */
@@ -74,6 +75,7 @@ export function suggestNext(
   setDef: SetDefinition,
   prior: LoggedSet | undefined,
 ): OverloadSuggestion | undefined {
+  if (setDef.isWarmup) return undefined;
   if (setDef.weightMode === 'percentageOfSet') return undefined;
   if (prior == null) return undefined;
 

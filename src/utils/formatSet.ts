@@ -12,19 +12,20 @@ export function formatSetDefinition(set: SetDefinition): string {
       : set.targetWeightKg != null
         ? `${set.targetWeightKg} kg`
         : '—';
+  const prefix = set.isWarmup ? 'Warm-up · ' : '';
   if (set.isMyorep) {
     const activation = set.toFailure
       ? 'to failure'
       : `${set.myorep?.activationRepTarget ?? '?'} reps`;
     const miniReps = set.myorep?.miniSetRepTarget ?? '?';
     const miniRest = set.myorep?.miniSetRestSeconds ?? '?';
-    return `Myorep: ${activation} + minisets of ${miniReps} (${miniRest}s rest) × ${weight}`;
+    return `${prefix}Myorep: ${activation} + minisets of ${miniReps} (${miniRest}s rest) × ${weight}`;
   }
-  if (set.toFailure) return `To failure × ${weight}`;
+  if (set.toFailure) return `${prefix}To failure × ${weight}`;
   const reps = set.targetRepsMax
     ? `${set.targetReps}–${set.targetRepsMax}`
     : `${set.targetReps}`;
-  return `${reps} × ${weight}`;
+  return `${prefix}${reps} × ${weight}`;
 }
 
 function percentageSummary(set: SetDefinition): string {

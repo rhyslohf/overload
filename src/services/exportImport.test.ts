@@ -9,6 +9,8 @@ import {
   exportHistory,
   parseHistoryImport,
   importHistory,
+  migrateRoutineExport,
+  migrateHistoryExport,
 } from './exportImport';
 import type { Routine, WorkoutSession } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
@@ -97,6 +99,80 @@ describe('exportHistory', () => {
   });
 });
 
+describe('migrateRoutineExport', () => {
+  it('leaves a current-version payload unchanged', () => {
+    const routine = createRoutine({ name: 'Push Day' });
+    const payload = {
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: '2026-08-10T00:00:00.000Z',
+      routine,
+    };
+
+    const result = migrateRoutineExport(payload);
+
+    expect(result).toEqual(payload);
+    expect(result.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+
+  it('rejects a payload from a newer app version', () => {
+    const routine = createRoutine({ name: 'Push Day' });
+    const payload = {
+      schemaVersion: SCHEMA_VERSION + 1,
+      exportedAt: '2026-08-10T00:00:00.000Z',
+      routine,
+    };
+
+    expect(() => migrateRoutineExport(payload)).toThrow(/newer app version/i);
+  });
+
+  it('rejects a payload that is not a routine export', () => {
+    expect(() => migrateRoutineExport('nope')).toThrow(ImportError);
+    expect(() => migrateRoutineExport(null)).toThrow(ImportError);
+    expect(() => migrateRoutineExport([1, 2, 3])).toThrow(ImportError);
+    expect(() =>
+      migrateRoutineExport({ schemaVersion: SCHEMA_VERSION }),
+    ).toThrow(/routine export/i);
+  });
+});
+
+describe('migrateHistoryExport', () => {
+  it('leaves a current-version payload unchanged', () => {
+    const sessions = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    const payload = {
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: '2026-08-10T00:00:00.000Z',
+      sessions,
+    };
+
+    const result = migrateHistoryExport(payload);
+
+    expect(result).toEqual(payload);
+    expect(result.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+
+  it('rejects a payload from a newer app version', () => {
+    const sessions = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    const payload = {
+      schemaVersion: SCHEMA_VERSION + 1,
+      exportedAt: '2026-08-10T00:00:00.000Z',
+      sessions,
+    };
+
+    expect(() => migrateHistoryExport(payload)).toThrow(/newer app version/i);
+  });
+
+  it('rejects a payload that is not a history export', () => {
+    expect(() => migrateHistoryExport(42)).toThrow(ImportError);
+    expect(() =>
+      migrateHistoryExport({ schemaVersion: SCHEMA_VERSION }),
+    ).toThrow(/history export/i);
+  });
+});
+
 describe('parseHistoryImport', () => {
   function historyExportJson(sessions: WorkoutSession[]): string {
     return JSON.stringify({
@@ -139,6 +215,19 @@ describe('parseHistoryImport', () => {
     expect(() => parseHistoryImport(historyExportJson([session]))).toThrow(
       /routine name/i,
     );
+  });
+
+  it('rejects a wrapped payload from a newer app version', () => {
+    const sessions = [
+      createWorkoutSession(createRoutine({ name: 'Push Day' })),
+    ];
+    const json = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION + 1,
+      exportedAt: '2026-08-10T00:00:00.000Z',
+      sessions,
+    });
+
+    expect(() => parseHistoryImport(json)).toThrow(/newer app version/i);
   });
 });
 
@@ -214,6 +303,17 @@ describe('parseRoutineImport', () => {
     expect(() => parseRoutineImport(routineExportJson(routine))).toThrow(
       /name/i,
     );
+  });
+
+  it('rejects a wrapped payload from a newer app version', () => {
+    const routine = createRoutine({ name: 'Push Day' });
+    const json = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION + 1,
+      exportedAt: '2026-08-10T00:00:00.000Z',
+      routine,
+    });
+
+    expect(() => parseRoutineImport(json)).toThrow(/newer app version/i);
   });
 });
 

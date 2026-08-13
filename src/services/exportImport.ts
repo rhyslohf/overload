@@ -25,6 +25,94 @@ export interface HistoryExport {
   sessions: WorkoutSession[];
 }
 
+/** A raw export payload — migration steps are version-aware but shape-agnostic. */
+interface ExportPayload {
+  schemaVersion?: unknown;
+  [key: string]: unknown;
+}
+
+/** A migration step upgrades an export payload from version N to N+1. */
+type MigrationStep = (payload: ExportPayload) => ExportPayload;
+
+/**
+ * Step-up migrations keyed by the schema version they upgrade FROM
+ * (REQUIREMENTS.md §4.5: exports carry `schemaVersion` so a future app
+ * version can migrate an older export instead of rejecting it). Empty today
+ * because v1 is the only released schema; a future v2 would add
+ * `routineMigrations[1] = (p) => ({ ...p, someNewField: p.someOldField })`.
+ */
+const routineMigrations: Record<number, MigrationStep> = {};
+const historyMigrations: Record<number, MigrationStep> = {};
+
+/**
+ * Bring `payload` up to the current SCHEMA_VERSION, applying one migration
+ * step per version gap. Throws `ImportError` for a payload newer than this
+ * app understands, or when no migration path exists for an old version.
+ */
+function migrateExport(
+  payload: ExportPayload,
+  steps: Record<number, MigrationStep>,
+  label: string,
+): ExportPayload {
+  const rawVersion = payload.schemaVersion;
+  const from =
+    rawVersion === undefined
+      ? 1
+      : typeof rawVersion === 'number'
+        ? rawVersion
+        : NaN;
+
+  if (!Number.isInteger(from) || from < 1) {
+    throw new ImportError(`${label} has an unrecognized schemaVersion.`);
+  }
+  if (from > SCHEMA_VERSION) {
+    throw new ImportError(
+      `${label} is from a newer app version (schema ${from}) and can't be imported yet.`,
+    );
+  }
+
+  let current = payload;
+  for (let version = from; version < SCHEMA_VERSION; version += 1) {
+    const step = steps[version];
+    if (!step) {
+      throw new ImportError(
+        `No migration path exists from ${label} schema ${version}.`,
+      );
+    }
+    current = step(current);
+  }
+  return { ...current, schemaVersion: SCHEMA_VERSION };
+}
+
+/** True when `value` is a non-null object (not an array). */
+function isRecord(value: unknown): value is ExportPayload {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Migrate a routine-export payload to the current schema version. */
+export function migrateRoutineExport(payload: unknown): RoutineExport {
+  if (!isRecord(payload)) {
+    throw new ImportError('File is not a routine export.');
+  }
+  const migrated = migrateExport(payload, routineMigrations, 'routine export');
+  if (!('routine' in migrated)) {
+    throw new ImportError('File is not a routine export.');
+  }
+  return migrated as unknown as RoutineExport;
+}
+
+/** Migrate a history-export payload to the current schema version. */
+export function migrateHistoryExport(payload: unknown): HistoryExport {
+  if (!isRecord(payload)) {
+    throw new ImportError('File is not a workout-history export.');
+  }
+  const migrated = migrateExport(payload, historyMigrations, 'history export');
+  if (!Array.isArray(migrated.sessions)) {
+    throw new ImportError('File is not a workout-history export.');
+  }
+  return migrated as unknown as HistoryExport;
+}
+
 /** Trigger a browser download of `json` as `filename`. */
 function downloadJson(filename: string, json: string): void {
   const blob = new Blob([json], { type: 'application/json' });
@@ -85,7 +173,8 @@ export type HistoryImportMode = 'merge' | 'replace';
  * `history-export.json`). Accepts either the wrapped shape or a bare
  * `WorkoutSession[]`. Returns the sessions. Throws `ImportError` on anything
  * that isn't a recognizable history export. Structural so an older-schema
- * export still imports — the migration stub (Phase 5 item 6) handles drift.
+ * export still imports; a wrapped payload is first migrated to the current
+ * schema version.
  */
 export function parseHistoryImport(json: string): WorkoutSession[] {
   let parsed: unknown;
@@ -97,10 +186,8 @@ export function parseHistoryImport(json: string): WorkoutSession[] {
 
   const rawSessions = Array.isArray(parsed)
     ? parsed
-    : parsed &&
-        typeof parsed === 'object' &&
-        Array.isArray((parsed as { sessions?: unknown }).sessions)
-      ? (parsed as { sessions: unknown[] }).sessions
+    : isRecord(parsed) && 'sessions' in parsed
+      ? migrateHistoryExport(parsed).sessions
       : null;
 
   if (rawSessions == null) {
@@ -163,8 +250,8 @@ function isNonEmptyString(value: unknown): value is string {
  * The check is intentionally structural rather than field-perfect: it only
  * insists on the fields the app actually needs to render and run a session
  * (a name, an exercises array whose entries have names and a sets array),
- * so a routine exported by an older schema version still imports instead of
- * being rejected — the migration stub (Phase 5 item 6) handles drift.
+ * so a routine exported by an older schema version still imports. A wrapped
+ * payload is first migrated to the current schema version.
  */
 export function parseRoutineImport(json: string): Routine {
   let parsed: unknown;
@@ -175,8 +262,8 @@ export function parseRoutineImport(json: string): Routine {
   }
 
   const candidate =
-    parsed && typeof parsed === 'object' && 'routine' in parsed
-      ? parsed.routine
+    isRecord(parsed) && 'routine' in parsed
+      ? migrateRoutineExport(parsed).routine
       : parsed;
 
   if (candidate == null || typeof candidate !== 'object') {

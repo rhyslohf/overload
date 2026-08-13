@@ -3,8 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { StorageProvider } from '../../components/StorageProvider';
 import { createLocalStorageAdapter } from '../../services/localStorageAdapter';
 import type { StorageService } from '../../services/storage';
-import type { Routine } from '../../types/models';
-import { createRoutine, createSetDefinition } from '../../types/factories';
+import type { Routine, WorkoutSession } from '../../types/models';
+import {
+  createLoggedSet,
+  createRoutine,
+  createSetDefinition,
+  createWorkoutSession,
+} from '../../types/factories';
 import RoutinesHome from '../routines/RoutinesHome';
 import { memoryStorage } from '../../test/memoryStorage';
 
@@ -492,5 +497,70 @@ describe('WorkoutSessionView — start a workout', () => {
       expect(sessions[0].status).toBe('abandoned');
       expect(sessions[0].completedAt).toBeTruthy();
     });
+  });
+
+  it('prefills an easy-reps-met set with a bumped suggested weight', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    const routine = routineWithSets('Push Day');
+    await storage.upsertRoutine(routine);
+    // Prior session: set 1 of the same routine was easy (10 reps ≥ target 10).
+    const prior: WorkoutSession = {
+      ...createWorkoutSession(routine),
+      status: 'completed',
+      completedAt: '2026-08-01T00:00:00.000Z',
+      exercises: [
+        {
+          ...createWorkoutSession(routine).exercises[0],
+          id: 'ex-1',
+          sets: [
+            createLoggedSet({
+              setDefId: routine.exercises[0].sets[0].id,
+              order: 0,
+              weightKg: 100,
+              reps: 10,
+              difficulty: 2,
+            }),
+          ],
+        },
+        createWorkoutSession(routine).exercises[1],
+      ],
+    };
+    await storage.upsertSession(prior);
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const weight = (
+      await within(exercise).findAllByLabelText(/Weight \(kg\)/)
+    )[0];
+    // 100 kg × 1.025 rounds to the 2.5 kg plate increment → 102.5.
+    expect((weight as HTMLInputElement).value).toBe('102.5');
+    expect(
+      await within(exercise).findByText(/Suggested · Last time: 100 kg × 10/),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the routine target when there is no prior history', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExercise();
+    const weight = (
+      await within(exercise).findAllByLabelText(/Weight \(kg\)/)
+    )[0];
+    expect((weight as HTMLInputElement).value).toBe('100');
+    expect(screen.queryByText(/Suggested ·/)).not.toBeInTheDocument();
   });
 });

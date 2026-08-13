@@ -10,6 +10,7 @@ import type {
   WorkoutSession,
 } from '../../types/models';
 import { createLoggedSet, createSetDefinition } from '../../types/factories';
+import { findPriorLoggedSet, suggestNext } from '../overload/suggest';
 import RestTimer from './RestTimer';
 import SetLogRow from './SetLogRow';
 
@@ -42,6 +43,8 @@ function WorkoutSessionView({
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [plan, setPlan] = useState<PlanExercise[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Finished history for this routine — drives §4.6 suggestions.
+  const [history, setHistory] = useState<WorkoutSession[]>([]);
   // Unplanned sets added during the session (§4.2). Keyed by session exercise
   // index; each entry is a synthetic SetDefinition the row can log against.
   const [extras, setExtras] = useState<Record<number, SetDefinition[]>>({});
@@ -54,9 +57,13 @@ function WorkoutSessionView({
       if (cancelled) return;
       setSession(result);
       if (result) {
-        void storage.getRoutine(result.routineId).then((routine) => {
+        void Promise.all([
+          storage.getRoutine(result.routineId),
+          storage.listSessions(),
+        ]).then(([routine, sessions]) => {
           if (cancelled) return;
           setPlan(planForSession(result, routine));
+          setHistory(sessions);
           setLoaded(true);
         });
       } else {
@@ -280,6 +287,12 @@ function WorkoutSessionView({
                           labelPrefix={`Set ${setIndex + 1}`}
                           sourceLoggedWeight={sourceWeightFor(exercise, set)}
                           logged={findLoggedSet(exercise, set)}
+                          suggestion={suggestionFor(
+                            exercise,
+                            set,
+                            current.routineId,
+                            history,
+                          )}
                           onLog={(input) =>
                             handleLog(exerciseIndex, set, input)
                           }
@@ -385,6 +398,25 @@ function sourceWeightFor(
   }
   return exercise.sets.find((s) => s.setDefId === set.percentageOf?.sourceSetId)
     ?.weightKg;
+}
+
+/**
+ * §4.6: suggested next weight/reps for a planned set, computed from the most
+ * recent finished session of this routine for this exercise + set position.
+ */
+function suggestionFor(
+  exercise: LoggedExercise,
+  set: SetDefinition,
+  routineId: string,
+  history: WorkoutSession[],
+) {
+  const prior = findPriorLoggedSet(
+    history,
+    routineId,
+    exercise.exerciseId,
+    set.order,
+  );
+  return suggestNext(set, prior);
 }
 
 /** Build the plan for a session: session exercises × the routine's set defs. */

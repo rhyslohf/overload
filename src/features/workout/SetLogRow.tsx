@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Button from '../../components/Button';
 import TextField from '../../components/TextField';
 import type { Difficulty, LoggedSet, SetDefinition } from '../../types/models';
+import type { OverloadSuggestion } from '../overload/suggest';
 import { formatLoggedSet } from '../../utils/formatSet';
 import { roundToIncrement } from '../../utils/weight';
 import TapSelector from './TapSelector';
@@ -11,6 +12,8 @@ interface SetLogRowProps {
   labelPrefix: string;
   sourceLoggedWeight?: number;
   logged?: LoggedSet;
+  // §4.6: progressive-overload suggestion used as the prefill + rationale.
+  suggestion?: OverloadSuggestion;
   onLog: (input: {
     weightKg: number;
     reps: number;
@@ -41,31 +44,30 @@ function SetLogRow({
   labelPrefix,
   sourceLoggedWeight,
   logged,
+  suggestion,
   onLog,
   onAddMiniSet,
   onSkip,
 }: SetLogRowProps) {
   const percentage = set.weightMode === 'percentageOfSet';
   const computed = percentage ? computedWeight() : undefined;
-  const [weight, setWeight] = useState(
-    computed != null
-      ? String(computed)
-      : set.targetWeightKg != null
-        ? String(set.targetWeightKg)
-        : '',
-  );
+  const [weight, setWeight] = useState(() => {
+    if (computed != null) return String(computed);
+    // §4.6: suggested next weight prefills, always editable.
+    if (suggestion?.weightKg != null) return String(suggestion.weightKg);
+    return set.targetWeightKg != null ? String(set.targetWeightKg) : '';
+  });
   // §4.2: to-failure sets prefill a blank reps field (log actual reps achieved).
-  const [reps, setReps] = useState(
-    set.toFailure
-      ? ''
-      : set.isMyorep
-        ? set.myorep?.activationRepTarget != null
-          ? String(set.myorep.activationRepTarget)
-          : ''
-        : set.targetReps != null
-          ? String(set.targetReps)
-          : '',
-  );
+  const [reps, setReps] = useState(() => {
+    if (set.toFailure) return '';
+    if (suggestion?.reps != null) return String(suggestion.reps);
+    if (set.isMyorep) {
+      return set.myorep?.activationRepTarget != null
+        ? String(set.myorep.activationRepTarget)
+        : '';
+    }
+    return set.targetReps != null ? String(set.targetReps) : '';
+  });
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   // Mini-set form shown once the activation set is logged (myorep only).
   const [miniSetReps, setMiniSetReps] = useState(
@@ -192,6 +194,12 @@ function SetLogRow({
         <p className="text-sm text-ink-2">
           Load {computed} kg ({set.percentageOf?.percent}% of{' '}
           {sourceLoggedWeight} kg)
+        </p>
+      )}
+
+      {suggestion?.rationale != null && (
+        <p className="text-sm text-accent">
+          Suggested · {suggestion.rationale}
         </p>
       )}
 

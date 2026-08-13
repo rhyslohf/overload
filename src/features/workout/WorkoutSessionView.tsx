@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Button from '../../components/Button';
+import LoadError from '../../components/LoadError';
 import { useStorage } from '../../components/StorageProvider';
 import type {
   Difficulty,
@@ -43,6 +44,8 @@ function WorkoutSessionView({
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [plan, setPlan] = useState<PlanExercise[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // Finished history for this routine — drives §4.6 suggestions.
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   // Unplanned sets added during the session (§4.2). Keyed by session exercise
@@ -53,30 +56,50 @@ function WorkoutSessionView({
 
   useEffect(() => {
     let cancelled = false;
-    void storage.getSession(sessionId).then((result) => {
-      if (cancelled) return;
-      setSession(result);
-      if (result) {
-        void Promise.all([
-          storage.getRoutine(result.routineId),
-          storage.listSessions(),
-        ]).then(([routine, sessions]) => {
-          if (cancelled) return;
-          setPlan(planForSession(result, routine));
-          setHistory(sessions);
-          setLoaded(true);
-        });
-      } else {
+    void storage
+      .getSession(sessionId)
+      .then((result) => {
+        if (cancelled) return;
+        setSession(result);
+        if (result) {
+          return Promise.all([
+            storage.getRoutine(result.routineId),
+            storage.listSessions(),
+          ]).then(([routine, sessions]) => {
+            if (cancelled) return;
+            setPlan(planForSession(result, routine));
+            setHistory(sessions);
+            setLoaded(true);
+          });
+        }
         setLoaded(true);
-      }
-    });
+        return undefined;
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded(true);
+        setLoadError(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [storage, sessionId]);
+  }, [storage, sessionId, reloadKey]);
 
   if (!loaded) {
     return <p className="text-sm text-ink-2">Loading…</p>;
+  }
+
+  if (loadError) {
+    return (
+      <LoadError
+        message="Couldn't load this workout."
+        onRetry={() => {
+          setLoadError(false);
+          setLoaded(false);
+          setReloadKey((key) => key + 1);
+        }}
+      />
+    );
   }
 
   if (session == null) {
@@ -232,7 +255,7 @@ function WorkoutSessionView({
         <button
           type="button"
           onClick={onBack}
-          className="self-start text-sm text-ink-2 transition-colors duration-100 hover:text-ink"
+          className="inline-flex min-h-11 items-center self-start text-sm text-ink-2 transition-colors duration-100 hover:text-ink"
         >
           ← Routines
         </button>

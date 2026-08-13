@@ -10,6 +10,7 @@ import type {
   importHistory,
 } from '../../services/exportImport';
 import { memoryStorage } from '../../test/memoryStorage';
+import { createFlakyStorage } from '../../test/flakyStorage';
 import type { Routine, WorkoutSession } from '../../types/models';
 import {
   createLoggedSet,
@@ -416,5 +417,31 @@ describe('HistoryHome — import', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByText(/Import 1 session\?/)).not.toBeInTheDocument();
+  });
+});
+
+describe('HistoryHome — load error', () => {
+  it('shows an error state with Retry, then recovers', async () => {
+    const user = userEvent.setup();
+    const base = createLocalStorageAdapter(memoryStorage());
+    const flaky = createFlakyStorage(base);
+    render(
+      <StorageProvider storage={flaky}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    expect(
+      await screen.findByText(/Couldn't load your history/),
+    ).toBeInTheDocument();
+
+    flaky.enable();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(
+      await screen.findByText(
+        "No logged sessions yet. Finish a workout and it'll land here.",
+      ),
+    ).toBeInTheDocument();
   });
 });

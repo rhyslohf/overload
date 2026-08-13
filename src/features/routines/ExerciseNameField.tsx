@@ -60,6 +60,10 @@ function ExerciseNameField({
     setOpen(false);
   }
 
+  function optionId(entry: ExerciseEntry): string {
+    return `${listId}-${entry.id}`;
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (matches.length === 0) return;
     if (event.key === 'ArrowDown') {
@@ -91,6 +95,11 @@ function ExerciseNameField({
         aria-expanded={open && matches.length > 0}
         aria-controls={listId}
         aria-autocomplete="list"
+        aria-activedescendant={
+          highlight >= 0 && matches[highlight] != null
+            ? optionId(matches[highlight])
+            : undefined
+        }
         value={value}
         onChange={(event) => {
           onChange(event.target.value);
@@ -115,6 +124,7 @@ function ExerciseNameField({
           {matches.map((entry, index) => (
             <li
               key={entry.id}
+              id={optionId(entry)}
               role="option"
               aria-selected={index === highlight}
               onMouseDown={(event) => {

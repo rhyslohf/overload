@@ -1,4 +1,5 @@
 import Button from '../../components/Button';
+import LoadError from '../../components/LoadError';
 import { useStorage } from '../../components/StorageProvider';
 import { exportRoutine } from '../../services/exportImport';
 import type { Routine } from '../../types/models';
@@ -28,21 +29,43 @@ function RoutineDetail({
   const storage = useStorage();
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    void storage.getRoutine(routineId).then((result) => {
-      if (cancelled) return;
-      setRoutine(result);
-      setLoaded(true);
-    });
+    void storage
+      .getRoutine(routineId)
+      .then((result) => {
+        if (cancelled) return;
+        setRoutine(result);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded(true);
+        setLoadError(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [storage, routineId]);
+  }, [storage, routineId, reloadKey]);
 
   if (!loaded) {
     return <p className="text-sm text-ink-2">Loading…</p>;
+  }
+
+  if (loadError) {
+    return (
+      <LoadError
+        message="Couldn't load this routine."
+        onRetry={() => {
+          setLoadError(false);
+          setLoaded(false);
+          setReloadKey((key) => key + 1);
+        }}
+      />
+    );
   }
 
   if (routine == null) {
@@ -62,7 +85,7 @@ function RoutineDetail({
         <button
           type="button"
           onClick={onBack}
-          className="self-start text-sm text-ink-2 transition-colors duration-100 hover:text-ink"
+          className="inline-flex min-h-11 items-center self-start text-sm text-ink-2 transition-colors duration-100 hover:text-ink"
         >
           ← Routines
         </button>

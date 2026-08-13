@@ -18,6 +18,7 @@ import {
 } from '../../types/factories';
 import RoutinesHome from './RoutinesHome';
 import { memoryStorage } from '../../test/memoryStorage';
+import { createFlakyStorage } from '../../test/flakyStorage';
 
 vi.mock('../../services/exportImport', async () => {
   const actual = await vi.importActual<{
@@ -739,6 +740,38 @@ describe('RoutinesHome — exercise-name autocomplete', () => {
     expect(screen.getByLabelText(/Exercise 1/)).toHaveValue('Overhead Press');
   });
 
+  it('announces the highlighted suggestion via aria-activedescendant', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+    await seedRoutine(storage, 'Seeded', 'Bench Press');
+    await seedRoutine(storage, 'Seeded 2', 'Incline Press');
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Push Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    const input = screen.getByLabelText(/Exercise 1/);
+    await user.type(input, 'press');
+
+    const options = await screen.findAllByRole('option');
+    expect(options.length).toBeGreaterThanOrEqual(2);
+
+    await user.keyboard('{ArrowDown}');
+
+    const highlighted = screen
+      .getAllByRole('option')
+      .find((option) => option.getAttribute('data-selected') === 'true');
+    const inputWithActivedescendant = screen.getByLabelText(/Exercise 1/);
+    expect(
+      inputWithActivedescendant.getAttribute('aria-activedescendant'),
+    ).toBe(highlighted?.id);
+
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByLabelText(/Exercise 1/)).toHaveValue(
+      highlighted?.textContent,
+    );
+  });
+
   it('shows a resume banner when an in-progress session exists', async () => {
     const storage = createLocalStorageAdapter(memoryStorage());
     await seedRoutine(storage, 'Seeded', 'Bench Press');
@@ -882,5 +915,29 @@ describe('RoutinesHome — import routine', () => {
       expect(routines).toHaveLength(2);
       expect(routines.some((r) => r.name === 'Push Day (copy)')).toBe(true);
     });
+  });
+});
+
+describe('RoutinesHome — load error', () => {
+  it('shows an error state with Retry, then recovers', async () => {
+    const user = userEvent.setup();
+    const base = createLocalStorageAdapter(memoryStorage());
+    const flaky = createFlakyStorage(base);
+    render(
+      <StorageProvider storage={flaky}>
+        <RoutinesHome />
+      </StorageProvider>,
+    );
+
+    expect(
+      await screen.findByText(/Couldn't load your routines/),
+    ).toBeInTheDocument();
+
+    flaky.enable();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(
+      await screen.findByText('No routines yet — build your first one.'),
+    ).toBeInTheDocument();
   });
 });

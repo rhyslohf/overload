@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button';
+import LoadError from '../../components/LoadError';
 import { useStorage } from '../../components/StorageProvider';
 import type { WorkoutSession } from '../../types/models';
 import {
@@ -36,6 +37,8 @@ function HistoryHome() {
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // Sessions parsed from a picked file, awaiting a merge/replace choice.
   const [pendingImport, setPendingImport] = useState<WorkoutSession[] | null>(
     null,
@@ -43,15 +46,22 @@ function HistoryHome() {
 
   useEffect(() => {
     let cancelled = false;
-    void storage.listSessions().then((result) => {
-      if (cancelled) return;
-      setSessions(sortSessions(result));
-      setLoaded(true);
-    });
+    void storage
+      .listSessions()
+      .then((result) => {
+        if (cancelled) return;
+        setSessions(sortSessions(result));
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded(true);
+        setLoadError(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [storage]);
+  }, [storage, reloadKey]);
 
   async function applyImport(
     incoming: WorkoutSession[],
@@ -152,7 +162,7 @@ function HistoryHome() {
           <button
             type="button"
             onClick={() => setPendingImport(null)}
-            className="self-center text-sm text-ink-3 transition-colors duration-100 hover:text-ink"
+            className="inline-flex min-h-11 items-center justify-center self-center text-sm text-ink-2 transition-colors duration-100 hover:text-ink"
           >
             Cancel
           </button>
@@ -161,6 +171,15 @@ function HistoryHome() {
 
       {!loaded ? (
         <p className="text-sm text-ink-2">Loading…</p>
+      ) : loadError ? (
+        <LoadError
+          message="Couldn't load your history."
+          onRetry={() => {
+            setLoadError(false);
+            setLoaded(false);
+            setReloadKey((key) => key + 1);
+          }}
+        />
       ) : sessions.length === 0 ? (
         <div className="flex flex-col items-center gap-3 pt-12 text-center">
           <p className="max-w-xs text-sm text-ink-2">

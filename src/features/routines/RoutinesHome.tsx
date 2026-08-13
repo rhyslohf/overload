@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button';
+import LoadError from '../../components/LoadError';
 import { useStorage } from '../../components/StorageProvider';
 import type { Routine, WorkoutSession } from '../../types/models';
 import { createWorkoutSession } from '../../types/factories';
@@ -23,6 +24,8 @@ function RoutinesHome() {
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [resumable, setResumable] = useState<WorkoutSession | null>(null);
 
   const [savedName, setSavedName] = useState<string | null>(null);
@@ -37,8 +40,8 @@ function RoutinesHome() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([storage.listRoutines(), storage.listSessions()]).then(
-      ([routinesResult, sessionsResult]) => {
+    void Promise.all([storage.listRoutines(), storage.listSessions()])
+      .then(([routinesResult, sessionsResult]) => {
         if (cancelled) return;
         setRoutines(routinesResult);
         // §4.2 resume: exactly one in-progress session at a time is assumed.
@@ -46,12 +49,16 @@ function RoutinesHome() {
           sessionsResult.find((s) => s.status === 'inProgress') ?? null,
         );
         setLoaded(true);
-      },
-    );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded(true);
+        setLoadError(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [storage]);
+  }, [storage, reloadKey]);
 
   function openEditor(routine: Routine | null) {
     setMode({ kind: 'editor', routine });
@@ -239,6 +246,15 @@ function RoutinesHome() {
 
       {!loaded ? (
         <p className="text-sm text-ink-2">Loading…</p>
+      ) : loadError ? (
+        <LoadError
+          message="Couldn't load your routines."
+          onRetry={() => {
+            setLoadError(false);
+            setLoaded(false);
+            setReloadKey((key) => key + 1);
+          }}
+        />
       ) : routines.length === 0 ? (
         <div className="flex flex-col items-center gap-3 pt-8 text-center">
           <p className="max-w-xs text-sm text-ink-2">

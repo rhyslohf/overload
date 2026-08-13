@@ -220,7 +220,7 @@ function SetLogRow({
         <button
           type="button"
           onClick={onSkip}
-          className="self-center text-sm text-ink-3 transition-colors duration-100 hover:text-ink"
+          className="inline-flex min-h-11 items-center justify-center self-center text-sm text-ink-2 transition-colors duration-100 hover:text-ink"
         >
           Skip this set
         </button>

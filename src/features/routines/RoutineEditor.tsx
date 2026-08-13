@@ -61,11 +61,13 @@ function RoutineEditor({
             (set.myorep?.activationRepTarget != null &&
               set.myorep.activationRepTarget > 0)
           : set.toFailure || (set.targetReps != null && set.targetReps > 0);
-        // §4.1: Percentage sets derive weight from a source set
+        // §4.1: Percentage sets derive weight from a source set; §11.2
+        // bodyweight sets carry no absolute weight (added weight is optional)
         const weightOk =
           set.weightMode === 'percentageOfSet'
             ? set.percentageOf != null && set.percentageOf.percent > 0
-            : set.targetWeightKg != null && set.targetWeightKg > 0;
+            : set.weightMode === 'bodyweight' ||
+              (set.targetWeightKg != null && set.targetWeightKg > 0);
         // §4.1: a percentage source must be an earlier set in this exercise
         const sourceOk =
           set.weightMode !== 'percentageOfSet' ||

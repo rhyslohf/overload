@@ -85,6 +85,7 @@ export function createLoggedSet(
     weightKg: number;
     reps: number;
     difficulty: LoggedSet['difficulty'];
+    isBodyweight?: boolean;
     myorepMiniSets?: { reps: number }[];
   },
   completedAt: string = new Date().toISOString(),
@@ -96,6 +97,7 @@ export function createLoggedSet(
     weightKg: input.weightKg,
     reps: input.reps,
     difficulty: input.difficulty,
+    isBodyweight: input.isBodyweight,
     myorepMiniSets: input.myorepMiniSets,
     completedAt,
   };

@@ -484,6 +484,52 @@ describe('RoutinesHome — warm-up toggle', () => {
   });
 });
 
+describe('RoutinesHome — bodyweight toggle', () => {
+  it('flips a set to bodyweight with optional added weight and saves it', async () => {
+    const user = userEvent.setup();
+    const storage = renderRoutines();
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Pull Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Pull-Up');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '8');
+    await user.type(screen.getByLabelText(/Set 1 weight/), '60');
+    await user.click(screen.getByRole('switch', { name: /Set 1 bodyweight/i }));
+
+    expect(
+      screen.queryByLabelText(/Set 1 weight \(kg\)/),
+    ).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/Set 1 added weight/), '5');
+
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await waitFor(async () => {
+      const routines = await storage.listRoutines();
+      const set = routines[0].exercises[0].sets[0];
+      expect(set.weightMode).toBe('bodyweight');
+      expect(set.targetWeightKg).toBeUndefined();
+      expect(set.bodyweight?.addedWeightKg).toBe(5);
+    });
+  });
+
+  it('keeps Save enabled for pure bodyweight (no absolute weight needed)', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Pull Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Pull-Up');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '8');
+    await user.click(screen.getByRole('switch', { name: /Set 1 bodyweight/i }));
+
+    expect(screen.getByRole('button', { name: 'Save routine' })).toBeEnabled();
+  });
+});
+
 describe('RoutinesHome — percentage-of-set', () => {
   async function newRoutineWithTwoSets(
     user: ReturnType<typeof userEvent.setup>,
@@ -646,6 +692,25 @@ describe('RoutinesHome — list & select saved routines', () => {
     await user.click(screen.getByRole('button', { name: /Push Day/ }));
 
     expect(screen.getByText(/Warm-up · 10 × 40 kg/)).toBeInTheDocument();
+  });
+
+  it('marks bodyweight sets with added weight in the detail view', async () => {
+    const user = userEvent.setup();
+    renderRoutines();
+
+    await user.click(screen.getByRole('button', { name: 'New routine' }));
+    await user.type(screen.getByLabelText(/Routine name/), 'Pull Day');
+    await user.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await user.type(screen.getByLabelText(/Exercise 1/), 'Pull-Up');
+    await user.click(screen.getByRole('button', { name: 'Add set' }));
+    await user.type(screen.getByLabelText(/Set 1 reps/), '8');
+    await user.click(screen.getByRole('switch', { name: /Set 1 bodyweight/i }));
+    await user.type(screen.getByLabelText(/Set 1 added weight/), '5');
+    await user.click(screen.getByRole('button', { name: 'Save routine' }));
+
+    await user.click(screen.getByRole('button', { name: /Pull Day/ }));
+
+    expect(screen.getByText(/8 × Bodyweight \+ 5 kg/)).toBeInTheDocument();
   });
 
   it('lists saved routines with their exercise count', async () => {

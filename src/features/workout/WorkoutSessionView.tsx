@@ -126,6 +126,7 @@ function WorkoutSessionView({
       weightKg: input.weightKg,
       reps: input.reps,
       difficulty: input.difficulty,
+      isBodyweight: setDef.weightMode === 'bodyweight',
     });
     appendLoggedSet(exerciseIndex, logged);
   }
@@ -229,6 +230,7 @@ function WorkoutSessionView({
         weightKg: input.weightKg,
         reps: input.reps,
         difficulty: input.difficulty,
+        isBodyweight: extra.weightMode === 'bodyweight',
       }),
     );
     setExtras({

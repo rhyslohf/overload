@@ -67,6 +67,24 @@ function SetList({ sets, onChange }: SetListProps) {
     handlePatch(index, { isWarmup: !sets[index].isWarmup });
   }
 
+  // §11.2: bodyweight sets carry no absolute weight — optional "+ added
+  // weight" instead. Switching on clears absolute config; off clears added.
+  function handleBodyweightToggle(index: number) {
+    const set = sets[index];
+    if (set.weightMode === 'bodyweight') {
+      handlePatch(index, {
+        weightMode: 'absolute',
+        bodyweight: undefined,
+      });
+    } else {
+      handlePatch(index, {
+        weightMode: 'bodyweight',
+        targetWeightKg: undefined,
+        bodyweight: { addedWeightKg: set.bodyweight?.addedWeightKg },
+      });
+    }
+  }
+
   function handleMyorepToggle(index: number) {
     const set = sets[index];
     if (set.isMyorep) {
@@ -101,6 +119,7 @@ function SetList({ sets, onChange }: SetListProps) {
       const source = sets[index - 1];
       handlePatch(index, {
         weightMode: 'percentageOfSet',
+        bodyweight: undefined,
         percentageOf: source
           ? { sourceSetId: source.id, percent: 80 }
           : undefined,
@@ -186,7 +205,14 @@ function SetList({ sets, onChange }: SetListProps) {
             </Button>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Switch
+              className="flex-1"
+              checked={set.weightMode === 'bodyweight'}
+              label="Bodyweight"
+              ariaLabel={`Set ${index + 1} bodyweight`}
+              onClick={() => handleBodyweightToggle(index)}
+            />
             <Switch
               className="flex-1"
               checked={set.isWarmup === true}
@@ -231,17 +257,33 @@ function SetList({ sets, onChange }: SetListProps) {
                 placeholder="10"
               />
             )}
-            {set.weightMode !== 'percentageOfSet' && (
+            {set.weightMode !== 'percentageOfSet' &&
+              set.weightMode !== 'bodyweight' && (
+                <TextField
+                  label={`Set ${index + 1} weight (kg)`}
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={numberInput(set.targetWeightKg)}
+                  onChange={(raw) =>
+                    handlePatch(index, { targetWeightKg: parseNumber(raw) })
+                  }
+                  placeholder={set.isMyorep ? 'Activation weight' : '60'}
+                />
+              )}
+            {set.weightMode === 'bodyweight' && (
               <TextField
-                label={`Set ${index + 1} weight (kg)`}
+                label={`Set ${index + 1} added weight (kg)`}
                 type="number"
                 min={0}
                 step={0.5}
-                value={numberInput(set.targetWeightKg)}
+                value={numberInput(set.bodyweight?.addedWeightKg)}
                 onChange={(raw) =>
-                  handlePatch(index, { targetWeightKg: parseNumber(raw) })
+                  handlePatch(index, {
+                    bodyweight: { addedWeightKg: parseNumber(raw) },
+                  })
                 }
-                placeholder={set.isMyorep ? 'Activation weight' : '60'}
+                placeholder="0 (pure bodyweight)"
               />
             )}
           </div>

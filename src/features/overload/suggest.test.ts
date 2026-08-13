@@ -124,6 +124,48 @@ describe('suggestNext', () => {
     ).toBeUndefined();
   });
 
+  it('progresses pure bodyweight sets by reps, not weight', () => {
+    const set = createSetDefinition(0, {
+      weightMode: 'bodyweight',
+      bodyweight: { addedWeightKg: 0 },
+      targetReps: 10,
+    });
+    const bw = createLoggedSet({
+      setDefId: 'def-1',
+      order: 0,
+      weightKg: 0,
+      reps: 12,
+      difficulty: 2,
+      isBodyweight: true,
+    });
+
+    const result = suggestNext(set, bw);
+
+    expect(result?.weightKg).toBe(0);
+    expect(result?.reps).toBe(11);
+    expect(result?.rationale).toMatch(/try 11 reps/);
+  });
+
+  it('keeps the target reps for a bodyweight set that was hard', () => {
+    const set = createSetDefinition(0, {
+      weightMode: 'bodyweight',
+      bodyweight: { addedWeightKg: 5 },
+      targetReps: 8,
+    });
+    const bw = createLoggedSet({
+      setDefId: 'def-1',
+      order: 0,
+      weightKg: 5,
+      reps: 8,
+      difficulty: 4,
+      isBodyweight: true,
+    });
+
+    const result = suggestNext(set, bw);
+
+    expect(result?.reps).toBe(8);
+  });
+
   it('returns undefined with no prior log (routine default used)', () => {
     const set = createSetDefinition(0, { targetReps: 8, targetWeightKg: 100 });
     expect(suggestNext(set, undefined)).toBeUndefined();

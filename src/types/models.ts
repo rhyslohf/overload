@@ -28,15 +28,20 @@ export interface RoutineExercise {
   sets: SetDefinition[];
 }
 
+export type WeightMode = 'absolute' | 'bodyweight' | 'percentageOfSet';
+
 export interface SetDefinition {
   id: string;
   order: number;
   targetReps?: number;
   targetRepsMax?: number; // optional top of range, for double progression
   toFailure: boolean;
-  weightMode: 'absolute' | 'percentageOfSet';
+  weightMode: WeightMode;
   targetWeightKg?: number; // when weightMode = 'absolute'
   percentageOf?: { sourceSetId: string; percent: number }; // when weightMode = 'percentageOfSet'
+  // §11.2: bodyweight exercises (pull-ups, dips, …) — weight optional, the
+  // "+ added weight" field carries belt/plate load (0 / undefined = pure BW).
+  bodyweight?: { addedWeightKg?: number };
   isMyorep: boolean;
   myorep?: {
     activationRepTarget?: number;
@@ -77,6 +82,9 @@ export interface LoggedSet {
   weightKg: number;
   reps: number;
   difficulty: 1 | 2 | 3 | 4 | 5;
+  // §11.2: pure bodyweight / added-weight — weightKg is the added load
+  // (0 = pure bodyweight), flagged so history renders "Bodyweight".
+  isBodyweight?: boolean;
   myorepMiniSets?: { reps: number }[]; // weight = this set's weightKg
   completedAt: string;
 }

@@ -79,12 +79,38 @@ export function suggestNext(
   if (setDef.weightMode === 'percentageOfSet') return undefined;
   if (prior == null) return undefined;
 
+  const priorLine = `Last time: ${prior.weightKg} kg × ${prior.reps} @ difficulty ${prior.difficulty}`;
   const targetReps = targetRepsFor(setDef);
+
+  // §11.2: bodyweight sets progress by reps. A +2.5% bump is meaningless for
+  // pure bodyweight (0 × anything = 0) and wrong ranges for added weight.
+  if (setDef.weightMode === 'bodyweight') {
+    if (targetReps == null) {
+      return {
+        weightKg: prior.weightKg,
+        reps: undefined,
+        rationale: `${priorLine} → keep bodyweight`,
+      };
+    }
+    const metReps = prior.reps >= targetReps;
+    // Easy or moderate + reps met → next rep bump; otherwise keep the target.
+    const reps =
+      prior.difficulty <= MODERATE_DIFFICULTY && metReps
+        ? targetReps + 1
+        : targetReps;
+    const hint =
+      reps === targetReps + 1 ? `try ${reps} reps` : `keep ${targetReps} reps`;
+    return {
+      weightKg: prior.weightKg,
+      reps,
+      rationale: `${priorLine} → ${hint}`,
+    };
+  }
+
   // No target (to-failure / unset) → reps are best-effort, never a miss.
   const metReps = targetReps == null || prior.reps >= targetReps;
   const bumped = roundToIncrement(prior.weightKg * (1 + WEIGHT_BUMP_PCT));
   const trimmed = roundToIncrement(prior.weightKg * (1 - WEIGHT_TRIM_PCT));
-  const priorLine = `Last time: ${prior.weightKg} kg × ${prior.reps} @ difficulty ${prior.difficulty}`;
 
   if (prior.difficulty <= EASY_DIFFICULTY && metReps) {
     return {

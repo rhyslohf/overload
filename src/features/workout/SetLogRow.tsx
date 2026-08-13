@@ -50,11 +50,16 @@ function SetLogRow({
   onSkip,
 }: SetLogRowProps) {
   const percentage = set.weightMode === 'percentageOfSet';
+  const bodyweight = set.weightMode === 'bodyweight';
   const computed = percentage ? computedWeight() : undefined;
   const [weight, setWeight] = useState(() => {
     if (computed != null) return String(computed);
     // §4.6: suggested next weight prefills, always editable.
     if (suggestion?.weightKg != null) return String(suggestion.weightKg);
+    if (bodyweight) {
+      const added = set.bodyweight?.addedWeightKg;
+      return added != null ? String(added) : '';
+    }
     return set.targetWeightKg != null ? String(set.targetWeightKg) : '';
   });
   // §4.2: to-failure sets prefill a blank reps field (log actual reps achieved).
@@ -105,8 +110,7 @@ function SetLogRow({
     return (
       <div className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-3">
         <p className="text-sm font-medium tabular-nums text-ink">
-          Activation · {logged.weightKg} kg × {logged.reps} · difficulty{' '}
-          {logged.difficulty}
+          Activation · {formatLoggedSet(logged)}
         </p>
         {miniSets.length > 0 && (
           <ol className="flex flex-col gap-1 text-sm text-ink-2">
@@ -155,9 +159,12 @@ function SetLogRow({
 
   const weightValue = parseNumber(weight);
   const repsValue = parseNumber(reps);
+  // §11.2: bodyweight — the added-weight field is optional (0 = pure BW).
   const weightOk = percentage
     ? computed != null
-    : weightValue != null && weightValue > 0;
+    : bodyweight
+      ? weightValue == null || weightValue >= 0
+      : weightValue != null && weightValue > 0;
   const repsOk = repsValue != null && repsValue > 0;
   const canLog = difficulty != null && weightOk && repsOk;
 
@@ -165,7 +172,7 @@ function SetLogRow({
     <div className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-3">
       <div className="flex gap-2">
         <TextField
-          label={`${labelPrefix} Weight (kg)`}
+          label={`${labelPrefix} ${bodyweight ? 'Added weight (kg)' : 'Weight (kg)'}`}
           type="number"
           min={0}
           step={0.5}
@@ -208,10 +215,14 @@ function SetLogRow({
         className="w-full"
         disabled={!canLog}
         onClick={() => {
-          if (weightValue == null || repsValue == null || difficulty == null) {
-            return;
-          }
-          onLog({ weightKg: weightValue, reps: repsValue, difficulty });
+          if (repsValue == null || difficulty == null) return;
+          if (!weightOk) return;
+          // §11.2: a blank added-weight field logs 0 kg (pure bodyweight).
+          onLog({
+            weightKg: weightValue ?? 0,
+            reps: repsValue,
+            difficulty,
+          });
         }}
       >
         Log set

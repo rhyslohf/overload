@@ -46,9 +46,34 @@ function routineWithSets(name: string): Routine {
   };
 }
 
+function routineWithBodyweight(name: string): Routine {
+  return {
+    ...createRoutine({ name }),
+    exercises: [
+      {
+        id: 'ex-bw',
+        exerciseId: 'ex-id-pullup',
+        name: 'Pull-Up',
+        order: 0,
+        sets: [
+          createSetDefinition(0, {
+            targetReps: 8,
+            weightMode: 'bodyweight',
+            bodyweight: { addedWeightKg: 5 },
+          }),
+        ],
+      },
+    ],
+  };
+}
+
 describe('WorkoutSessionView — start a workout', () => {
   const firstExercise = async () => {
     const heading = await screen.findByRole('heading', { name: 'Bench Press' });
+    return heading.closest('li')!;
+  };
+  const firstExerciseFor = async (name: string) => {
+    const heading = await screen.findByRole('heading', { name });
     return heading.closest('li')!;
   };
   it('starting a workout snapshots the routine into a session', async () => {
@@ -143,6 +168,44 @@ describe('WorkoutSessionView — start a workout', () => {
         difficulty: 4,
       });
       expect(set.completedAt).toBeTruthy();
+    });
+  });
+
+  it('logs a bodyweight set with its added weight flagged', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithBodyweight('Pull Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Pull Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const exercise = await firstExerciseFor('Pull-Up');
+    const added = await within(exercise).findByLabelText(/Added weight \(kg\)/);
+    await user.clear(added);
+    await user.type(added, '6');
+    const reps = within(exercise).getByLabelText(/Reps/);
+    await user.clear(reps);
+    await user.type(reps, '10');
+    await user.click(
+      within(exercise).getByRole('button', { name: /Difficulty 2/ }),
+    );
+    await user.click(within(exercise).getByRole('button', { name: 'Log set' }));
+
+    expect(
+      await screen.findByText(/Logged · Bodyweight \+ 6 kg × 10/),
+    ).toBeInTheDocument();
+
+    await waitFor(async () => {
+      const sessions = await storage.listSessions();
+      expect(sessions[0].exercises[0].sets[0]).toMatchObject({
+        weightKg: 6,
+        reps: 10,
+        difficulty: 2,
+        isBodyweight: true,
+      });
     });
   });
 

@@ -214,6 +214,58 @@ describe('HistoryHome — detail', () => {
     expect(screen.getByText('No sets logged.')).toBeInTheDocument();
   });
 
+  it('shows a bodyweight logged set as Bodyweight in the detail view', async () => {
+    const storage: StorageService = createLocalStorageAdapter(memoryStorage());
+    const routine: Routine = {
+      ...createRoutine({ name: 'Pull Day' }),
+      exercises: [
+        {
+          id: 'ex-bw',
+          exerciseId: 'ex-id-pullup',
+          name: 'Pull-Up',
+          order: 0,
+          sets: [
+            createSetDefinition(0, { targetReps: 8, targetWeightKg: 100 }),
+          ],
+        },
+      ],
+    };
+    const session = createWorkoutSession(routine);
+    await storage.upsertSession({
+      ...session,
+      routineName: 'Pull Day',
+      status: 'completed',
+      completedAt: '2026-08-10T12:00:00.000Z',
+      exercises: [
+        {
+          ...session.exercises[0],
+          sets: [
+            createLoggedSet({
+              setDefId: 'set-bw',
+              order: 0,
+              weightKg: 6,
+              reps: 10,
+              difficulty: 2,
+              isBodyweight: true,
+            }),
+          ],
+        },
+      ],
+    });
+    render(
+      <StorageProvider storage={storage}>
+        <HistoryHome />
+      </StorageProvider>,
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Pull Day/ }));
+
+    expect(
+      screen.getByText(/Set 1 · Bodyweight \+ 6 kg × 10 · difficulty 2/),
+    ).toBeInTheDocument();
+  });
+
   it('shows myorep mini-sets in the detail view', async () => {
     const storage: StorageService = createLocalStorageAdapter(memoryStorage());
     const routine: Routine = {

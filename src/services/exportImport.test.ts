@@ -14,7 +14,11 @@ import {
 } from './exportImport';
 import type { Routine, WorkoutSession } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
-import { createRoutine, createWorkoutSession } from '../types/factories';
+import {
+  createRoutine,
+  createWorkoutSession,
+  createSetDefinition,
+} from '../types/factories';
 
 function routineExportJson(routine: Routine): string {
   return JSON.stringify({
@@ -270,6 +274,33 @@ describe('parseRoutineImport', () => {
     const parsed = parseRoutineImport(JSON.stringify(routine));
 
     expect(parsed).toEqual(routine);
+  });
+
+  it('round-trips a bodyweight set and keeps its added weight', () => {
+    const routine: Routine = {
+      ...createRoutine({ name: 'Pull Day' }),
+      exercises: [
+        {
+          id: 'ex-bw',
+          exerciseId: 'ex-id-pullup',
+          name: 'Pull-Up',
+          order: 0,
+          sets: [
+            {
+              ...createSetDefinition(0, { targetReps: 8 }),
+              weightMode: 'bodyweight',
+              bodyweight: { addedWeightKg: 5 },
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseRoutineImport(routineExportJson(routine));
+
+    const set = parsed.exercises[0].sets[0];
+    expect(set.weightMode).toBe('bodyweight');
+    expect(set.bodyweight?.addedWeightKg).toBe(5);
   });
 
   it('throws ImportError on invalid JSON', () => {

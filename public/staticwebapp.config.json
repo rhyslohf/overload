@@ -1,0 +1,43 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/assets/*",
+      "/manifest.webmanifest",
+      "/icon-192.png",
+      "/icon-512.png"
+    ]
+  },
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html"
+    }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
+  },
+  "mimeTypes": {
+    ".webmanifest": "application/manifest+json"
+  },
+  "cacheControl": {
+    "/sw.js": {
+      "maxAge": "0",
+      "noCache": true
+    },
+    "/index.html": {
+      "maxAge": "0",
+      "noCache": true
+    },
+    "/assets/*": {
+      "maxAge": "31536000",
+      "immutable": true
+    },
+    "/manifest.webmanifest": {
+      "maxAge": "3600",
+      "noCache": false
+    }
+  }
+}

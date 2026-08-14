@@ -1,5 +1,6 @@
-import type { Routine, WorkoutSession } from '../types/models';
+import type { Routine, RoutineExercise, WorkoutSession } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
+import { exerciseIdForName } from '../utils/exercise';
 
 /** Thrown when an uploaded file can't be parsed as a valid routine export. */
 export class ImportError extends Error {}
@@ -293,7 +294,19 @@ export function parseRoutineImport(json: string): Routine {
     }
   }
 
-  return routine as unknown as Routine;
+  return {
+    ...(routine as unknown as Routine),
+    exercises: (routine.exercises as RoutineExercise[]).map((exercise) => ({
+      ...exercise,
+      name: exercise.name.trim(),
+      // §11.1: re-derive the canonical, name-derived exerciseId so an import
+      // (older schema, hand-edited, or from another device) always matches
+      // the identity the editor and suggestion engine expect. A same-name
+      // exercise in any routine resolves to the same id — if we kept the
+      // file's id verbatim, progression matching (§7) could silently break.
+      exerciseId: exerciseIdForName(exercise.name),
+    })),
+  };
 }
 
 /**

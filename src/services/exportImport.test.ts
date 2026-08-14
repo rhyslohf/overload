@@ -19,6 +19,7 @@ import {
   createWorkoutSession,
   createSetDefinition,
 } from '../types/factories';
+import { exerciseIdForName } from '../utils/exercise';
 
 function routineExportJson(routine: Routine): string {
   return JSON.stringify({
@@ -274,6 +275,48 @@ describe('parseRoutineImport', () => {
     const parsed = parseRoutineImport(JSON.stringify(routine));
 
     expect(parsed).toEqual(routine);
+  });
+
+  it('re-derives the canonical exerciseId from the name (§11.1)', () => {
+    const routine: Routine = {
+      ...createRoutine({ name: 'Push Day' }),
+      exercises: [
+        {
+          id: 'ex-1',
+          exerciseId: 'stale-id-xyz',
+          name: 'Bench Press',
+          order: 0,
+          sets: [],
+        },
+      ],
+    };
+
+    const parsed = parseRoutineImport(routineExportJson(routine));
+
+    expect(parsed.exercises[0].exerciseId).toBe(
+      exerciseIdForName('Bench Press'),
+    );
+    expect(parsed.exercises[0].exerciseId).not.toBe('stale-id-xyz');
+  });
+
+  it('derives an exerciseId when an older export carries none (§11.1)', () => {
+    const legacyExercise = {
+      id: 'ex-1',
+      // old-schema legacy: no exerciseId
+      name: 'Bench Press',
+      order: 0,
+      sets: [],
+    };
+    const routine: Routine = {
+      ...createRoutine({ name: 'Push Day' }),
+      exercises: [legacyExercise as unknown as Routine['exercises'][number]],
+    };
+
+    const parsed = parseRoutineImport(routineExportJson(routine));
+
+    expect(parsed.exercises[0].exerciseId).toBe(
+      exerciseIdForName('Bench Press'),
+    );
   });
 
   it('round-trips a bodyweight set and keeps its added weight', () => {

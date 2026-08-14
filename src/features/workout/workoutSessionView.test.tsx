@@ -107,7 +107,7 @@ describe('WorkoutSessionView — start a workout', () => {
     });
   });
 
-  it('shows a planned set row for each snapshotted set', async () => {
+  it('collapses every exercise and opens only the first one', async () => {
     const user = userEvent.setup();
     const storage = createLocalStorageAdapter(memoryStorage());
     await storage.upsertRoutine(routineWithSets('Push Day'));
@@ -118,10 +118,25 @@ describe('WorkoutSessionView — start a workout', () => {
       await screen.findByRole('button', { name: 'Start workout' }),
     );
 
-    expect(await screen.findByText('Bench Press')).toBeInTheDocument();
-    expect(screen.getAllByText('Set 1')).toHaveLength(2);
-    expect(screen.getAllByText('Set 2')).toHaveLength(1);
-    expect(screen.getByText('Lat Pulldown')).toBeInTheDocument();
+    // First exercise is open and shows its planned sets.
+    const bench = await firstExercise();
+    expect(within(bench).getByText(/^Set 1$/)).toBeInTheDocument();
+    expect(within(bench).getByText(/^Set 2$/)).toBeInTheDocument();
+    expect(
+      within(bench).getByRole('button', { name: '+ Add set' }),
+    ).toBeInTheDocument();
+
+    // Later exercises stay collapsed — header only, no set rows.
+    const lat = await firstExerciseFor('Lat Pulldown');
+    expect(
+      within(lat).getByRole('button', { name: 'Expand Lat Pulldown' }),
+    ).toBeInTheDocument();
+    expect(within(lat).queryByText(/^Set /)).not.toBeInTheDocument();
+    expect(
+      within(lat).queryByRole('button', { name: '+ Add set' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/^Set 1$/)).toHaveLength(1);
+    expect(screen.getAllByText(/^Set 2$/)).toHaveLength(1);
   });
 
   it('logs a set with weight, reps and difficulty and saves it', async () => {
@@ -194,6 +209,12 @@ describe('WorkoutSessionView — start a workout', () => {
     );
     await user.click(within(exercise).getByRole('button', { name: 'Log set' }));
 
+    // The one planned set completes the exercise → it auto-collapses.
+    expect(await screen.findByText('✓ Done')).toBeInTheDocument();
+    // Re-open it to review the read-only logged row.
+    await user.click(
+      await screen.findByRole('button', { name: 'Expand Pull-Up' }),
+    );
     expect(
       await screen.findByText(/Logged · Bodyweight \+ 6 kg × 10/),
     ).toBeInTheDocument();
@@ -364,8 +385,10 @@ describe('WorkoutSessionView — start a workout', () => {
     expect(
       within(exercise).queryByRole('button', { name: 'Add mini-set' }),
     ).not.toBeInTheDocument();
+    // The exercise finishes and auto-collapses, flagged done in its header.
+    expect(await screen.findByText('✓ Done')).toBeInTheDocument();
     expect(
-      await within(exercise).findByText(/Logged · 100 kg × 12/),
+      screen.getByRole('button', { name: 'Expand Bench Press' }),
     ).toBeInTheDocument();
   });
 
@@ -625,5 +648,119 @@ describe('WorkoutSessionView — start a workout', () => {
     )[0];
     expect((weight as HTMLInputElement).value).toBe('100');
     expect(screen.queryByText(/Suggested ·/)).not.toBeInTheDocument();
+  });
+
+  /** Fills and logs the next still-open row inside `exercise`. */
+  async function logRow(
+    user: ReturnType<typeof userEvent.setup>,
+    exercise: HTMLElement,
+    weightValue: string,
+    repsValue: string,
+  ) {
+    const logButton = within(exercise).getAllByRole('button', {
+      name: 'Log set',
+    })[0];
+    const row = logButton.closest('div')!;
+    const weight = within(row).getByLabelText(/Weight \(kg\)/);
+    const reps = within(row).getByLabelText(/Reps/);
+    await user.clear(weight);
+    await user.type(weight, weightValue);
+    await user.clear(reps);
+    await user.type(reps, repsValue);
+    await user.click(within(row).getByRole('button', { name: /Difficulty 3/ }));
+    await user.click(within(row).getByRole('button', { name: 'Log set' }));
+  }
+
+  it('auto-collapses a done exercise and opens the next one', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const bench = await firstExercise();
+    await logRow(user, bench, '100', '10');
+    await logRow(user, bench, '90', '8');
+
+    const lat = await firstExerciseFor('Lat Pulldown');
+    await waitFor(() => {
+      expect(
+        within(lat).getByRole('button', { name: 'Log set' }),
+      ).toBeInTheDocument();
+    });
+    const benchNow = await firstExerciseFor('Bench Press');
+    expect(
+      within(benchNow).getByRole('button', { name: 'Expand Bench Press' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(benchNow).queryByRole('button', { name: '+ Add set' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the rest timer pinned above the active exercise', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const bench = await firstExercise();
+    expect(
+      within(bench).getByRole('button', { name: /Rest timer/ }),
+    ).toBeInTheDocument();
+    const lat = await firstExerciseFor('Lat Pulldown');
+    expect(
+      within(lat).queryByRole('button', { name: /Rest timer/ }),
+    ).not.toBeInTheDocument();
+
+    await logRow(user, bench, '100', '10');
+    await logRow(user, bench, '90', '8');
+
+    const latNow = await firstExerciseFor('Lat Pulldown');
+    await waitFor(() => {
+      expect(
+        within(latNow).getByRole('button', { name: /Rest timer/ }),
+      ).toBeInTheDocument();
+    });
+    const benchNow = await firstExerciseFor('Bench Press');
+    expect(
+      within(benchNow).queryByRole('button', { name: /Rest timer/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lets the user expand a collapsed exercise to review it', async () => {
+    const user = userEvent.setup();
+    const storage = createLocalStorageAdapter(memoryStorage());
+    await storage.upsertRoutine(routineWithSets('Push Day'));
+    renderWithStorage(storage);
+
+    await user.click(await screen.findByRole('button', { name: /Push Day/ }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Start workout' }),
+    );
+
+    const lat = await firstExerciseFor('Lat Pulldown');
+    await user.click(
+      within(lat).getByRole('button', { name: 'Expand Lat Pulldown' }),
+    );
+
+    const latNow = await firstExerciseFor('Lat Pulldown');
+    expect(
+      within(latNow).getByRole('button', { name: 'Log set' }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(latNow).getByRole('button', { name: 'Collapse Lat Pulldown' }),
+    );
+    expect(
+      within(latNow).queryByRole('button', { name: 'Log set' }),
+    ).not.toBeInTheDocument();
   });
 });

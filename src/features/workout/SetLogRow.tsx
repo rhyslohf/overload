@@ -22,6 +22,8 @@ interface SetLogRowProps {
   }) => void;
   onAddMiniSet: (reps: number) => void;
   onSkip?: () => void;
+  /** Myorep: the user finished the mini-set adder (§collapse auto-advance). */
+  onMarkDone?: () => void;
 }
 
 function parseNumber(raw: string): number | undefined {
@@ -49,6 +51,7 @@ function SetLogRow({
   onLog,
   onAddMiniSet,
   onSkip,
+  onMarkDone,
 }: SetLogRowProps) {
   const percentage = set.weightMode === 'percentageOfSet';
   const bodyweight = set.weightMode === 'bodyweight';
@@ -153,7 +156,13 @@ function SetLogRow({
             Add mini-set
           </Button>
         </div>
-        <Button variant="secondary" onClick={() => setMiniSetsDone(true)}>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setMiniSetsDone(true);
+            onMarkDone?.();
+          }}
+        >
           Mark myorep done
         </Button>
       </div>

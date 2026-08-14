@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface RestTimerProps {
+  /** When non-null the clock runs from this instant (controlled by the parent
+   * so the timer survives moving with the active exercise during a workout). */
+  runningSince: number | null;
+  /** Tap = restart from now (§4.3) — ask the parent to start a fresh rest. */
+  onTap: () => void;
   targetRestSeconds?: number;
-  /** Increment to auto-start a fresh rest (§4.3 recommended) — e.g. each set log. */
-  autoStartSignal?: number;
 }
 
 function formatSeconds(total: number): string {
@@ -14,15 +17,13 @@ function formatSeconds(total: number): string {
 
 /**
  * Rest Timer (§4.3). One large thumb-friendly button — no stopwatch "lap".
- *   - Tap while idle → starts counting up from 0:00.
- *   - Tap while running → resets to 0:00 and immediately keeps running.
- * Never persisted — a live UI aid only. Arrives at 0:00 by starting (or
- * restarting) the clock from "now", so a tap is always "restart from zero".
+ *   - Idle → tap to start counting up from 0:00.
+ *   - Running → tap to reset to 0:00 and immediately keep running.
+ * Never persisted — a live UI aid only. The parent owns `runningSince` so the
+ * timer can be repositioned above the active exercise without losing time.
  */
-function RestTimer({ targetRestSeconds, autoStartSignal = 0 }: RestTimerProps) {
-  const [runningSince, setRunningSince] = useState<number | null>(null);
+function RestTimer({ runningSince, onTap, targetRestSeconds }: RestTimerProps) {
   const [now, setNow] = useState(() => Date.now());
-  const seenSignal = useRef(0);
 
   useEffect(() => {
     if (runningSince == null) return;
@@ -30,32 +31,16 @@ function RestTimer({ targetRestSeconds, autoStartSignal = 0 }: RestTimerProps) {
     return () => window.clearInterval(timer);
   }, [runningSince]);
 
-  // §4.3 (recommended): a fresh rest starts automatically on each set log.
-  useEffect(() => {
-    if (autoStartSignal !== seenSignal.current) {
-      seenSignal.current = autoStartSignal;
-      const started = Date.now();
-      setRunningSince(started);
-      setNow(started);
-    }
-  }, [autoStartSignal]);
-
   const running = runningSince != null;
   const elapsedMs = running ? Math.max(0, now - runningSince) : 0;
   const elapsed = Math.floor(elapsedMs / 1000);
   const overTarget = targetRestSeconds != null && elapsed > targetRestSeconds;
 
-  function handleTap() {
-    const started = Date.now();
-    setRunningSince(started);
-    setNow(started);
-  }
-
   return (
     <div className="flex flex-col gap-1">
       <button
         type="button"
-        onClick={handleTap}
+        onClick={onTap}
         aria-label={
           running
             ? `Rest timer, ${formatSeconds(elapsed)}, running — tap to restart`

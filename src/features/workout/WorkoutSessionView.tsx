@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button';
 import LoadError from '../../components/LoadError';
 import { useSettings } from '../../components/SettingsProvider';
@@ -30,10 +30,20 @@ interface PlanExercise {
   sets: SetDefinition[];
 }
 
+/** Ms since the epoch. Module scope so `Date.now()` isn't called in render. */
+function nowMs(): number {
+  return Date.now();
+}
+
 /**
  * Live workout logging screen (Phase 3). The session is a snapshot taken at
  * start (§4.2); sets are logged against the routine's plan, and every log is
  * persisted immediately (§4.2 autosave).
+ *
+ * Focused flow: only the active exercise is open — the rest collapse to their
+ * headers. When the open exercise's last set is done it auto-collapses and the
+ * next unfinished exercise expands, and the rest timer stays pinned right
+ * above the active exercise so it travels with the routine (§ collapse).
  */
 function WorkoutSessionView({
   sessionId,
@@ -53,8 +63,14 @@ function WorkoutSessionView({
   // Unplanned sets added during the session (§4.2). Keyed by session exercise
   // index; each entry is a synthetic SetDefinition the row can log against.
   const [extras, setExtras] = useState<Record<number, SetDefinition[]>>({});
-  // §4.3 (recommended): increment to auto-start a fresh rest per set log.
-  const [restSignal, setRestSignal] = useState(0);
+  // Which exercise's card is open (§ focus). One at a time; null = all closed.
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  // Myorep sets keep their mini-set adder until the user marks them done — the
+  // exercise only counts as finished once that happens.
+  const [myorepDoneSetDefIds, setMyorepDoneSetDefIds] = useState<string[]>([]);
+  // Rest timer state lives here so the timer survives moving between exercises.
+  const [restRunningSince, setRestRunningSince] = useState<number | null>(null);
+  const previousDone = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +85,12 @@ function WorkoutSessionView({
             storage.listSessions(),
           ]).then(([routine, sessions]) => {
             if (cancelled) return;
-            setPlan(planForSession(result, routine));
+            const planForResult = planForSession(result, routine);
+            setPlan(planForResult);
             setHistory(sessions);
+            // § focus: open the first exercise that still has work. Set here
+            // (batched with `loaded`) so the very first painted frame is open.
+            setExpandedIndex(firstOpenExercise(result, planForResult, {}, []));
             setLoaded(true);
           });
         }
@@ -86,6 +106,34 @@ function WorkoutSessionView({
       cancelled = true;
     };
   }, [storage, sessionId, reloadKey]);
+
+  // § focus: when the open exercise's last set is done, collapse it and open
+  // the next unfinished one. Snapshot of the timer position right after.
+  useEffect(() => {
+    if (!loaded || session == null || expandedIndex == null) return;
+    const id = session.exercises[expandedIndex]?.id;
+    if (id == null) return;
+    const done = exerciseIsDone(
+      session,
+      plan,
+      extras,
+      myorepDoneSetDefIds,
+      expandedIndex,
+    );
+    const wasDone = previousDone.current[id];
+    previousDone.current = { ...previousDone.current, [id]: done };
+    if (wasDone === false && done) {
+      setExpandedIndex(
+        nextOpenExercise(
+          session,
+          plan,
+          extras,
+          myorepDoneSetDefIds,
+          expandedIndex,
+        ),
+      );
+    }
+  }, [loaded, session, plan, extras, expandedIndex, myorepDoneSetDefIds]);
 
   if (!loaded) {
     return <p className="text-sm text-ink-2">Loading…</p>;
@@ -163,7 +211,7 @@ function WorkoutSessionView({
     };
     setSession(next);
     void storage.upsertSession(next);
-    setRestSignal((n) => n + 1);
+    setRestRunningSince(nowMs());
   }
 
   function appendLoggedSet(
@@ -180,7 +228,7 @@ function WorkoutSessionView({
     };
     setSession(next);
     void storage.upsertSession(next);
-    setRestSignal((n) => n + 1);
+    setRestRunningSince(nowMs());
   }
 
   // §4.2 "skip a planned one without breaking the session": record the setDefId
@@ -241,6 +289,20 @@ function WorkoutSessionView({
     });
   }
 
+  function handleToggleExercise(index: number) {
+    setExpandedIndex((open) => (open === index ? null : index));
+  }
+
+  function handleMarkMyorepDone(set: SetDefinition) {
+    setMyorepDoneSetDefIds((ids) =>
+      ids.includes(set.id) ? ids : [...ids, set.id],
+    );
+  }
+
+  function handleRestTap() {
+    setRestRunningSince(nowMs());
+  }
+
   function plannedSetsFor(exerciseIndex: number): SetDefinition[] {
     return plan[exerciseIndex]?.sets ?? [];
   }
@@ -252,6 +314,8 @@ function WorkoutSessionView({
 
   const skippedFor = (exercise: LoggedExercise, set: SetDefinition) =>
     (exercise.skippedSetDefIds ?? []).includes(set.id);
+
+  const targetRest = nextTargetRest(current.exercises, plan, skippedFor);
 
   return (
     <div className="flex flex-col gap-4">
@@ -278,90 +342,139 @@ function WorkoutSessionView({
         </p>
       </div>
 
-      <RestTimer
-        autoStartSignal={restSignal}
-        targetRestSeconds={nextTargetRest(current.exercises, plan, skippedFor)}
-      />
+      {expandedIndex == null && (
+        <RestTimer
+          runningSince={restRunningSince}
+          onTap={handleRestTap}
+          targetRestSeconds={targetRest}
+        />
+      )}
 
       <ol className="flex flex-col gap-3">
         {current.exercises.map((exercise, exerciseIndex) => {
+          const expanded = exerciseIndex === expandedIndex;
           const sets = plannedSets.get(exerciseIndex) ?? [];
           const exerciseExtras = extras[exerciseIndex] ?? [];
+          const done = exerciseIsDone(
+            current,
+            plan,
+            extras,
+            myorepDoneSetDefIds,
+            exerciseIndex,
+          );
           return (
-            <li
-              key={exercise.id}
-              className="rounded-lg border border-line bg-panel p-3"
-            >
-              <h2 className="font-semibold">{exercise.name}</h2>
-              {sets.length === 0 ? (
-                <p className="mt-1 text-sm text-ink-3">No sets planned.</p>
-              ) : (
-                <ol className="mt-2 flex flex-col gap-2">
-                  {sets.map((set, setIndex) => (
-                    <li key={set.id}>
-                      <p className="pb-1 text-xs font-semibold text-ink-3">
-                        Set {setIndex + 1}
-                      </p>
-                      {skippedFor(exercise, set) ? (
-                        <div className="rounded-lg border border-line/70 bg-raise p-3">
-                          <p className="text-sm font-medium text-ink-2">
-                            Skipped
-                          </p>
-                        </div>
-                      ) : (
-                        <SetLogRow
-                          set={set}
-                          labelPrefix={`Set ${setIndex + 1}`}
-                          sourceLoggedWeight={sourceWeightFor(exercise, set)}
-                          logged={findLoggedSet(exercise, set)}
-                          suggestion={suggestionFor(
-                            exercise,
-                            set,
-                            current.routineId,
-                            history,
-                            settings.roundingIncrement,
-                          )}
-                          onLog={(input) =>
-                            handleLog(exerciseIndex, set, input)
-                          }
-                          onAddMiniSet={(miniReps) =>
-                            handleAddMiniSet(exerciseIndex, set, miniReps)
-                          }
-                          onSkip={() => handleSkip(exerciseIndex, set)}
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ol>
+            <li key={exercise.id} className="flex flex-col gap-3">
+              {expanded && (
+                <RestTimer
+                  runningSince={restRunningSince}
+                  onTap={handleRestTap}
+                  targetRestSeconds={targetRest}
+                />
               )}
-              {exerciseExtras.length > 0 && (
-                <ol className="mt-2 flex flex-col gap-2">
-                  {exerciseExtras.map((extra) => (
-                    <li
-                      key={extra.id}
-                      className="rounded-lg border border-dashed border-line bg-panel p-2"
+              <div className="rounded-lg border border-line bg-panel p-3">
+                <button
+                  type="button"
+                  onClick={() => handleToggleExercise(exerciseIndex)}
+                  aria-expanded={expanded}
+                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${exercise.name}`}
+                  className="flex w-full items-center justify-between gap-2 text-left"
+                >
+                  <h2 className="font-semibold">{exercise.name}</h2>
+                  <span className="flex items-center gap-2">
+                    {done && (
+                      <span className="text-sm font-medium text-accent-hi">
+                        ✓ Done
+                      </span>
+                    )}
+                    <span
+                      aria-hidden="true"
+                      className="text-lg leading-none text-ink-3"
                     >
-                      <SetLogRow
-                        set={extra}
-                        labelPrefix="Extra"
-                        sourceLoggedWeight={undefined}
-                        logged={findLoggedSet(exercise, extra)}
-                        onLog={(input) =>
-                          handleLogExtra(exerciseIndex, extra, input)
-                        }
-                        onAddMiniSet={() => {}}
-                      />
-                    </li>
-                  ))}
-                </ol>
-              )}
-              <button
-                type="button"
-                onClick={() => handleAddSet(exerciseIndex)}
-                className="mt-3 self-start rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink-2 transition-colors duration-100 hover:bg-raise"
-              >
-                + Add set
-              </button>
+                      {expanded ? '▾' : '▸'}
+                    </span>
+                  </span>
+                </button>
+
+                {expanded && (
+                  <>
+                    {sets.length === 0 ? (
+                      <p className="mt-1 text-sm text-ink-3">
+                        No sets planned.
+                      </p>
+                    ) : (
+                      <ol className="mt-2 flex flex-col gap-2">
+                        {sets.map((set, setIndex) => (
+                          <li key={set.id}>
+                            <p className="pb-1 text-xs font-semibold text-ink-3">
+                              Set {setIndex + 1}
+                            </p>
+                            {skippedFor(exercise, set) ? (
+                              <div className="rounded-lg border border-line/70 bg-raise p-3">
+                                <p className="text-sm font-medium text-ink-2">
+                                  Skipped
+                                </p>
+                              </div>
+                            ) : (
+                              <SetLogRow
+                                set={set}
+                                labelPrefix={`Set ${setIndex + 1}`}
+                                sourceLoggedWeight={sourceWeightFor(
+                                  exercise,
+                                  set,
+                                )}
+                                logged={findLoggedSet(exercise, set)}
+                                suggestion={suggestionFor(
+                                  exercise,
+                                  set,
+                                  current.routineId,
+                                  history,
+                                  settings.roundingIncrement,
+                                )}
+                                onLog={(input) =>
+                                  handleLog(exerciseIndex, set, input)
+                                }
+                                onAddMiniSet={(miniReps) =>
+                                  handleAddMiniSet(exerciseIndex, set, miniReps)
+                                }
+                                onMarkDone={() => handleMarkMyorepDone(set)}
+                                onSkip={() => handleSkip(exerciseIndex, set)}
+                              />
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    {exerciseExtras.length > 0 && (
+                      <ol className="mt-2 flex flex-col gap-2">
+                        {exerciseExtras.map((extra) => (
+                          <li
+                            key={extra.id}
+                            className="rounded-lg border border-dashed border-line bg-panel p-2"
+                          >
+                            <SetLogRow
+                              set={extra}
+                              labelPrefix="Extra"
+                              sourceLoggedWeight={undefined}
+                              logged={findLoggedSet(exercise, extra)}
+                              onLog={(input) =>
+                                handleLogExtra(exerciseIndex, extra, input)
+                              }
+                              onAddMiniSet={() => {}}
+                            />
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleAddSet(exerciseIndex)}
+                      className="mt-3 self-start rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-ink-2 transition-colors duration-100 hover:bg-raise"
+                    >
+                      + Add set
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           );
         })}
@@ -392,6 +505,63 @@ function findLoggedSet(
   set: SetDefinition,
 ): WorkoutSession['exercises'][number]['sets'][number] | undefined {
   return exercise.sets.find((s) => s.setDefId === set.id);
+}
+
+/**
+ * § focus: an exercise is done when every planned set is logged or skipped
+ * (myorep sets additionally need "Mark myorep done") and no unlogged extra
+ * rows are still open for it. Exercises with no planned sets count as done.
+ */
+function exerciseIsDone(
+  session: WorkoutSession,
+  plan: PlanExercise[],
+  extras: Record<number, SetDefinition[]>,
+  myorepDoneSetDefIds: string[],
+  index: number,
+): boolean {
+  const unit = session.exercises[index];
+  const sets = plan[index]?.sets ?? [];
+  const plannedDone =
+    sets.length === 0 ||
+    sets.every((set) => {
+      if ((unit.skippedSetDefIds ?? []).includes(set.id)) return true;
+      const logged = unit.sets.find((s) => s.setDefId === set.id);
+      if (logged == null) return false;
+      if (set.isMyorep) return myorepDoneSetDefIds.includes(set.id);
+      return true;
+    });
+  return plannedDone && (extras[index]?.length ?? 0) === 0;
+}
+
+/** First exercise (from the top) that still has work remaining. */
+function firstOpenExercise(
+  session: WorkoutSession,
+  plan: PlanExercise[],
+  extras: Record<number, SetDefinition[]>,
+  myorepDoneSetDefIds: string[],
+): number | null {
+  for (let i = 0; i < session.exercises.length; i += 1) {
+    if (!exerciseIsDone(session, plan, extras, myorepDoneSetDefIds, i)) {
+      return i;
+    }
+  }
+  return null;
+}
+
+/** Next exercise after `from` that still has work remaining. */
+function nextOpenExercise(
+  session: WorkoutSession,
+  plan: PlanExercise[],
+  extras: Record<number, SetDefinition[]>,
+  myorepDoneSetDefIds: string[],
+  from: number,
+): number | null {
+  for (let i = from + 1; i < session.exercises.length; i += 1) {
+    if (!exerciseIsDone(session, plan, extras, myorepDoneSetDefIds, i)) {
+      return i;
+    }
+  }
+  return null;
 }
 
 /**

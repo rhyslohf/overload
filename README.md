@@ -2,8 +2,6 @@
 
 A mobile-first, offline-first single-page web app for logging workouts. Build or browse routines, run them live at the gym (weight / reps / difficulty per set), use a rest timer between sets, and get simple data-driven suggestions for what to lift next time. All data lives in the browser — full JSON export/import for backup and portability.
 
-Day-to-day progress is tracked in [PROGRESS.md](./PROGRESS.md).
-
 ## Features
 
 **Routine builder** — create, edit, reorder, and delete routines made of exercises and sets. Supports:
@@ -104,6 +102,6 @@ Everything stays in your browser's `localStorage`. Export routines or full histo
 
 ## Status
 
-All phases 0–8 complete: scaffolding/design foundations through routine builder, advanced set types, live logging, rest timer, history/portability, progressive-overload intelligence, polish (accessibility, empty/error states, PWA, deployment), and the recommended additions (stable exercise identity, bodyweight support, warm-up flag, rounding increment). **171 tests passing.** See [PROGRESS.md](./PROGRESS.md) for the full history and deviation log.
+All phases 0–8 complete: scaffolding/design foundations through routine builder, advanced set types, live logging, rest timer, history/portability, progressive-overload intelligence, polish (accessibility, empty/error states, PWA, deployment), and the recommended additions (stable exercise identity, bodyweight support, warm-up flag, rounding increment). **171 tests passing.**
 
 Explicitly beyond scope (future ideas): 1-rep-max estimation, volume/progress charts, timed/distance-based exercises, multi-device sync.

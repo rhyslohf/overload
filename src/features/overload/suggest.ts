@@ -3,7 +3,7 @@ import type {
   SetDefinition,
   WorkoutSession,
 } from '../../types/models';
-import { roundToIncrement } from '../../utils/weight';
+import { roundToIncrement, ROUNDING_INCREMENT } from '../../utils/weight';
 
 /**
  * Progressive-overload suggestion algorithm (REQUIREMENTS.md §7).
@@ -70,10 +70,14 @@ export function findPriorLoggedSet(
  *   - warm-up sets get no suggestion at all (§11.3);
  *   - percentage-of-set sets get no independent suggestion (recomputed live);
  *   - no prior history → fall back to the routine's stored target (§4.6).
+ *
+ * `roundingIncrement` (§11.4) snaps the bump to the plates the user loads;
+ * defaults to the standard 2.5 kg.
  */
 export function suggestNext(
   setDef: SetDefinition,
   prior: LoggedSet | undefined,
+  roundingIncrement: number = ROUNDING_INCREMENT,
 ): OverloadSuggestion | undefined {
   if (setDef.isWarmup) return undefined;
   if (setDef.weightMode === 'percentageOfSet') return undefined;
@@ -109,8 +113,14 @@ export function suggestNext(
 
   // No target (to-failure / unset) → reps are best-effort, never a miss.
   const metReps = targetReps == null || prior.reps >= targetReps;
-  const bumped = roundToIncrement(prior.weightKg * (1 + WEIGHT_BUMP_PCT));
-  const trimmed = roundToIncrement(prior.weightKg * (1 - WEIGHT_TRIM_PCT));
+  const bumped = roundToIncrement(
+    prior.weightKg * (1 + WEIGHT_BUMP_PCT),
+    roundingIncrement,
+  );
+  const trimmed = roundToIncrement(
+    prior.weightKg * (1 - WEIGHT_TRIM_PCT),
+    roundingIncrement,
+  );
 
   if (prior.difficulty <= EASY_DIFFICULTY && metReps) {
     return {

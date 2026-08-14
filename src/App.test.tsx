@@ -28,4 +28,19 @@ describe('App shell', () => {
       'page',
     );
   });
+
+  it('switches to the Settings view via the bottom nav', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+
+    expect(
+      screen.getByRole('heading', { name: 'Settings' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
 });

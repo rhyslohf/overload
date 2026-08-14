@@ -1,5 +1,6 @@
 import Button from '../../components/Button';
 import Select from '../../components/Select';
+import { useSettings } from '../../components/SettingsProvider';
 import Switch from '../../components/Switch';
 import TextField from '../../components/TextField';
 import { createSetDefinition } from '../../types/factories';
@@ -36,6 +37,8 @@ const MYOREP_DEFAULTS = {
  * the next item — percentage-of-set. Immutable add/remove/reorder.
  */
 function SetList({ sets, onChange }: SetListProps) {
+  const { settings } = useSettings();
+
   function handlePatch(index: number, partial: Partial<SetDefinition>) {
     const next = [...sets];
     next[index] = { ...next[index], ...partial };
@@ -150,7 +153,10 @@ function SetList({ sets, onChange }: SetListProps) {
     if (!percentage || percentage.percent <= 0) return null;
     const source = sets.find((s) => s.id === percentage.sourceSetId);
     if (!source || source.targetWeightKg == null) return null;
-    return roundToIncrement((source.targetWeightKg * percentage.percent) / 100);
+    return roundToIncrement(
+      (source.targetWeightKg * percentage.percent) / 100,
+      settings.roundingIncrement,
+    );
   }
 
   /** §4.1: the reference must point to an earlier set in this exercise. */

@@ -25,6 +25,8 @@ export function createFlakyStorage(
     getSession: (id) => base.getSession(id),
     upsertSession: (session: WorkoutSession) => base.upsertSession(session),
     deleteSession: (id) => base.deleteSession(id),
+    getSettings: () => base.getSettings(),
+    saveSettings: (settings) => base.saveSettings(settings),
     getExerciseLibrary: () => base.getExerciseLibrary(),
   };
   return Object.assign(service, {

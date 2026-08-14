@@ -216,6 +216,27 @@ describe('suggestNext', () => {
     expect(result?.rationale).toMatch(/keep 100 kg/);
   });
 
+  it('snaps the bump to the configured rounding increment (§11.4)', () => {
+    const set = createSetDefinition(0, { targetReps: 8, targetWeightKg: 140 });
+    const priorLog = createLoggedSet({
+      setDefId: 'def-1',
+      order: 0,
+      weightKg: 140,
+      reps: 10,
+      difficulty: 2,
+    });
+
+    // 140 × 1.025 = 143.5 → snaps to 145 on a 5 kg increment.
+    const fiveKg = suggestNext(set, priorLog, 5);
+
+    expect(fiveKg?.weightKg).toBe(145);
+    expect(fiveKg?.rationale).toMatch(/suggested 145 kg/);
+
+    // The same prior snaps to 142.5 on the default 2.5 kg increment.
+    const defaultBump = suggestNext(set, priorLog);
+    expect(defaultBump?.weightKg).toBe(142.5);
+  });
+
   it('keeps the weight on max effort (difficulty 5)', () => {
     const set = createSetDefinition(0, { targetReps: 8, targetWeightKg: 100 });
     const result = suggestNext(set, prior({ reps: 8, difficulty: 5 }));

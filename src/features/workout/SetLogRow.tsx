@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Button from '../../components/Button';
+import { useSettings } from '../../components/SettingsProvider';
 import TextField from '../../components/TextField';
 import type { Difficulty, LoggedSet, SetDefinition } from '../../types/models';
 import type { OverloadSuggestion } from '../overload/suggest';
@@ -51,6 +52,7 @@ function SetLogRow({
 }: SetLogRowProps) {
   const percentage = set.weightMode === 'percentageOfSet';
   const bodyweight = set.weightMode === 'bodyweight';
+  const { settings } = useSettings();
   const computed = percentage ? computedWeight() : undefined;
   const [weight, setWeight] = useState(() => {
     if (computed != null) return String(computed);
@@ -88,6 +90,7 @@ function SetLogRow({
     }
     return roundToIncrement(
       (sourceLoggedWeight * set.percentageOf.percent) / 100,
+      settings.roundingIncrement,
     );
   }
 

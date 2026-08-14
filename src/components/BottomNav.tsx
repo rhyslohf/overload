@@ -1,8 +1,9 @@
-export type View = 'routines' | 'history';
+export type View = 'routines' | 'history' | 'settings';
 
 const VIEWS: ReadonlyArray<{ id: View; label: string }> = [
   { id: 'routines', label: 'Routines' },
   { id: 'history', label: 'History' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 function ClipboardList({ active }: { active: boolean }) {
@@ -45,6 +46,26 @@ function Clock({ active }: { active: boolean }) {
   );
 }
 
+function Gear({ active }: { active: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={active ? 'text-accent' : 'text-ink-3'}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
 interface BottomNavProps {
   view: View;
   onViewChange: (view: View) => void;
@@ -56,10 +77,15 @@ function BottomNav({ view, onViewChange }: BottomNavProps) {
       aria-label="Primary"
       className="sticky bottom-0 z-10 border-t border-line bg-panel px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
     >
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {VIEWS.map((item) => {
           const active = item.id === view;
-          const Icon = item.id === 'routines' ? ClipboardList : Clock;
+          const Icon =
+            item.id === 'routines'
+              ? ClipboardList
+              : item.id === 'history'
+                ? Clock
+                : Gear;
           return (
             <button
               key={item.id}

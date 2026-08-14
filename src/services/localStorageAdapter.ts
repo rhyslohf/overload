@@ -1,10 +1,31 @@
 import type { ExerciseEntry, Routine, WorkoutSession } from '../types/models';
 import { SCHEMA_VERSION } from '../types/models';
 import { buildExerciseLibrary } from '../utils/exercise';
-import type { StorageService } from './storage';
+import type { AppSettings, StorageService } from './storage';
 
 const ROUTINES_KEY = 'wt:routines';
 const SESSIONS_KEY = 'wt:sessions';
+const SETTINGS_KEY = 'wt:settings';
+
+/** §11.4: default rounding increment — 2.5 kg plates (§9.1). */
+export const DEFAULT_ROUNDING_INCREMENT = 2.5;
+
+function readSettings(storage: Storage): AppSettings {
+  const raw = storage.getItem(SETTINGS_KEY);
+  if (!raw) return { roundingIncrement: DEFAULT_ROUNDING_INCREMENT };
+  try {
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    const increment = parsed.roundingIncrement;
+    return {
+      roundingIncrement:
+        typeof increment === 'number' && increment > 0
+          ? increment
+          : DEFAULT_ROUNDING_INCREMENT,
+    };
+  } catch {
+    return { roundingIncrement: DEFAULT_ROUNDING_INCREMENT };
+  }
+}
 
 interface StoredCollection<T> {
   schemaVersion: number;
@@ -94,6 +115,14 @@ export function createLocalStorageAdapter(
         SESSIONS_KEY,
       ).filter((session) => session.id !== id);
       writeCollection(storage, SESSIONS_KEY, sessions);
+    },
+
+    async getSettings(): Promise<AppSettings> {
+      return readSettings(storage);
+    },
+
+    async saveSettings(settings: AppSettings): Promise<void> {
+      storage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     },
 
     async getExerciseLibrary(): Promise<ExerciseEntry[]> {

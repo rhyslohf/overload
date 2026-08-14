@@ -148,6 +148,30 @@ describe('LocalStorageAdapter — exercise library', () => {
   });
 });
 
+describe('LocalStorageAdapter — settings', () => {
+  it('defaults the rounding increment to 2.5 kg (§11.4)', async () => {
+    await expect(service.getSettings()).resolves.toEqual({
+      roundingIncrement: 2.5,
+    });
+  });
+
+  it('saves and reloads a custom rounding increment', async () => {
+    await service.saveSettings({ roundingIncrement: 5 });
+
+    await expect(service.getSettings()).resolves.toEqual({
+      roundingIncrement: 5,
+    });
+  });
+
+  it('falls back to the default on a corrupt settings payload', async () => {
+    storage.setItem('wt:settings', '{not json');
+
+    await expect(service.getSettings()).resolves.toEqual({
+      roundingIncrement: 2.5,
+    });
+  });
+});
+
 describe('LocalStorageAdapter — resilience', () => {
   it('treats corrupt payloads as empty', async () => {
     storage.setItem('wt:routines', '{not json');

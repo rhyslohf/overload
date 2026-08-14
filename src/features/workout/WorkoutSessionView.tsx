@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Button from '../../components/Button';
 import LoadError from '../../components/LoadError';
+import { useSettings } from '../../components/SettingsProvider';
 import { useStorage } from '../../components/StorageProvider';
 import type {
   Difficulty,
@@ -41,6 +42,7 @@ function WorkoutSessionView({
   onAbandon,
 }: WorkoutSessionViewProps) {
   const storage = useStorage();
+  const { settings } = useSettings();
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [plan, setPlan] = useState<PlanExercise[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -317,6 +319,7 @@ function WorkoutSessionView({
                             set,
                             current.routineId,
                             history,
+                            settings.roundingIncrement,
                           )}
                           onLog={(input) =>
                             handleLog(exerciseIndex, set, input)
@@ -434,6 +437,7 @@ function suggestionFor(
   set: SetDefinition,
   routineId: string,
   history: WorkoutSession[],
+  roundingIncrement: number,
 ) {
   const prior = findPriorLoggedSet(
     history,
@@ -441,7 +445,7 @@ function suggestionFor(
     exercise.exerciseId,
     set.order,
   );
-  return suggestNext(set, prior);
+  return suggestNext(set, prior, roundingIncrement);
 }
 
 /** Build the plan for a session: session exercises × the routine's set defs. */

@@ -1,13 +1,22 @@
-/* Workout Tracker service worker — offline-first app shell (REQUIREMENTS.md §5).
- * Data lives in localStorage, so we only need to cache the static shell. */
+/* Workout Tracker service worker — offline-first app shell.
+ * Data lives in localStorage, so we only need to cache the static shell.
+ * Scope-aware: registered from BASE_URL/sw.js, so the base path (e.g.
+ * "/overload/" on GitHub Pages) is derived from the registration scope —
+ * cache keys and the shell list are always under that base. */
 const CACHE = 'workout-tracker-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
+  const scope = self.registration.scope; // ends with "/" → e.g. "/overload/"
+  const shell = [
+    `${scope}index.html`,
+    `${scope}manifest.webmanifest`,
+    `${scope}icon-192.png`,
+    `${scope}icon-512.png`,
+  ];
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(SHELL))
+      .then((cache) => cache.addAll(shell))
       .then(() => self.skipWaiting()),
   );
 });
@@ -28,16 +37,18 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  const scope = self.registration.scope;
+
   // Navigations: network-first so new deploys take effect, falling back to cache offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put('/', copy));
+          caches.open(CACHE).then((cache) => cache.put(`${scope}index.html`, copy));
           return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match(`${scope}index.html`)),
     );
     return;
   }

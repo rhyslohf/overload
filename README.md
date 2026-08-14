@@ -30,7 +30,7 @@ A mobile-first, offline-first single-page web app for logging workouts. Build or
 - Vitest + React Testing Library for tests (171 passing)
 - ESLint + Prettier with a husky pre-commit hook
 - PWA: manifest, service worker (offline-first), installable icons
-- Deployment: Azure Static Web Apps (`.github/workflows/azure-static-web-apps.yml` + `public/staticwebapp.config.json`)
+- Deployment: GitHub Pages (`.github/workflows/pages.yml`) — build runs lint/typecheck/test, then uploads `dist`
 
 No backend — data persists in `localStorage` behind a swappable `StorageService` interface (`src/services/localStorageAdapter.ts`), ready to be swapped for IndexedDB without touching feature code.
 
@@ -79,7 +79,7 @@ Then open the printed localhost URL in a browser.
   /utils             exercise identity, formatting, id generation
   /test              test fixtures (flaky storage, storage tests)
   App.tsx / main.tsx
-/public              PWA manifest, service worker, icons, SWA config
+/public              PWA manifest, service worker, icons
 ```
 
 ## Testing
@@ -94,7 +94,11 @@ The suite covers the bug-prone logic — overload calculation, percentage math, 
 
 ## Deployment
 
-The app is a static SPA with no backend. Push to GitHub and the included workflow (`.github/workflows/azure-static-web-apps.yml`) deploys to Azure Static Web Apps (staged PR deploys, close-PR cleanup). Config in `public/staticwebapp.config.json` handles SPA fallback, security headers, and cache control.
+The app is a static SPA with no backend, served from GitHub Pages under `/overload/` (set via Vite's `base` in `vite.config.ts`). Push to `main` and `.github/workflows/pages.yml` builds (lint + typecheck + tests), uploads `dist`, and deploys with `actions/deploy-pages`.
+
+**One-time setup:** in the repo's *Settings → Pages*, set **Source** to *GitHub Actions*.
+
+The app uses state-based views (no URL router), so there's no 404-fallback handling to configure.
 
 ## Data & Privacy
 

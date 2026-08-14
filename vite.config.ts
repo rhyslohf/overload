@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // GitHub Pages project site: https://<user>.github.io/overload/
+  base: '/overload/',
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'jsdom',

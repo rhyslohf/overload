@@ -10,14 +10,20 @@ interface SwitchProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Accessible on/off toggle (role="switch"). Sized for touch (§8): the whole
  * 44px-tall pill is tappable, with visual thumb + track feedback.
  */
-function Switch({ checked, label, ariaLabel, ...rest }: SwitchProps) {
+function Switch({
+  checked,
+  label,
+  ariaLabel,
+  className,
+  ...rest
+}: SwitchProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel ?? label}
-      className={`flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors duration-100 ${
+      className={`flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors duration-100 ${className ?? ''} ${
         checked
           ? 'border-accent/50 bg-accent/10 text-accent-hi'
           : 'border-line/70 bg-panel text-ink-2'

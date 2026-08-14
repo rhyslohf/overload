@@ -2,7 +2,7 @@
 
 A mobile-first, offline-first single-page web app for logging workouts. Build or browse routines, run them live at the gym (weight / reps / difficulty per set), use a rest timer between sets, and get simple data-driven suggestions for what to lift next time. All data lives in the browser — full JSON export/import for backup and portability.
 
-Built against [REQUIREMENTS.md](./REQUIREMENTS.md); day-to-day progress is tracked in [PROGRESS.md](./PROGRESS.md).
+Day-to-day progress is tracked in [PROGRESS.md](./PROGRESS.md).
 
 ## Features
 
